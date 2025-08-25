@@ -6,8 +6,39 @@ summaries while optionally preserving the original data.
 """
 
 import json
+import yaml
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
+
+
+def optimize_for_yaml(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Optimize data structure for YAML output to reduce token count.
+    
+    Args:
+        data: Dictionary to optimize
+        
+    Returns:
+        Optimized dictionary with unnecessary data removed
+    """
+    def clean_dict(obj):
+        """Recursively remove null/None values and optimize data."""
+        if isinstance(obj, dict):
+            cleaned = {}
+            for key, value in obj.items():
+                cleaned_value = clean_dict(value)
+                # Only include non-null values
+                if cleaned_value is not None and cleaned_value != [] and cleaned_value != {}:
+                    cleaned[key] = cleaned_value
+            return cleaned
+        elif isinstance(obj, list):
+            return [clean_dict(item) for item in obj if item is not None]
+        elif obj is None:
+            return None
+        else:
+            return obj
+    
+    return clean_dict(data)
 
 
 def create_formatted_response(
@@ -17,7 +48,7 @@ def create_formatted_response(
     include_raw_data: bool = False
 ) -> str:
     """
-    Create a standardized formatted response structure.
+    Create a standardized formatted response structure in YAML format.
     
     Args:
         raw_data: Original JSON response from GraphQL
@@ -26,20 +57,30 @@ def create_formatted_response(
         include_raw_data: Whether to include the raw GraphQL response
         
     Returns:
-        JSON string with formatted response
+        YAML formatted response string (optimized for token efficiency)
     """
     response = {
         "summary": summary,
-        "formatted_data": formatted_entries
+        "data": formatted_entries  # Shortened key for better compression
     }
     
     if include_raw_data:
         try:
-            response["raw_data"] = json.loads(raw_data)
+            response["raw"] = json.loads(raw_data)  # Shortened key
         except json.JSONDecodeError:
-            response["raw_data"] = {"error": "Could not parse raw data"}
+            response["raw"] = {"error": "Could not parse raw data"}
     
-    return json.dumps(response, indent=2)
+    # Optimize for YAML output (remove nulls, clean up data)
+    optimized_response = optimize_for_yaml(response)
+    
+    # Always return YAML for optimal token efficiency
+    return yaml.dump(
+        optimized_response,
+        default_flow_style=False,
+        sort_keys=False,
+        width=120,  # Wider lines = fewer line breaks = fewer tokens
+        allow_unicode=True
+    )
 
 
 def format_teams_response(raw_data: str, include_raw_data: bool = False) -> str:
@@ -162,38 +203,50 @@ def format_betting_response(raw_data: str, include_raw_data: bool = False) -> st
     try:
         data = json.loads(raw_data)
         
-        # Check if betting analysis already exists (from calculate_records=true)
-        if "betting_analysis" in data:
+        # Check if betting summary exists (from calculate_records=true)
+        if "betting_summary" in data:
             games = data.get("data", {}).get("game", [])
-            betting_analysis = data.get("betting_analysis", {})
+            betting_summary = data.get("betting_summary", {})
             
             # Enhanced summary with betting analysis
-            summary = betting_analysis.get("summary", {})
             enhanced_summary = {
                 "total_results": len(games),
                 "description": f"Found {len(games)} games with betting analysis",
-                "ats_record": summary.get("ats", "N/A"),
-                "ats_percentage": summary.get("ats_percentage", 0),
-                "ou_record": summary.get("ou", "N/A"),
-                "ou_percentage": summary.get("ou_percentage", 0),
-                "su_record": summary.get("su", "N/A"),
-                "su_percentage": summary.get("su_percentage", 0)
+                "ats_record": betting_summary.get("ats", "N/A"),
+                "ats_percentage": betting_summary.get("ats_percentage", 0),
+                "ou_record": betting_summary.get("ou", "N/A"),
+                "ou_percentage": betting_summary.get("ou_percentage", 0),
+                "su_record": betting_summary.get("su", "N/A"),
+                "su_percentage": betting_summary.get("su_percentage", 0)
             }
             
-            # Use the detailed game analysis
-            formatted_entries = betting_analysis.get("game_details", [])
+            # Create formatted entries from the raw games data
+            formatted_entries = []
+            for game in games:
+                if not all([
+                    game.get('homePoints') is not None,
+                    game.get('awayPoints') is not None,
+                    game.get('lines') and len(game['lines']) > 0
+                ]):
+                    continue
+                    
+                home_team_info = game.get('homeTeamInfo', {})
+                away_team_info = game.get('awayTeamInfo', {})
+                line = game['lines'][0]  # Use first betting line
+                
+                # Determine which team we're analyzing (based on betting_summary context)
+                # This is a simplified approach - the detailed analysis logic is in betting_utils
+                entry = {
+                    "opponent": away_team_info.get('school', 'TBD'),  # Simplified
+                    "result": f"{'W' if game.get('homePoints', 0) > game.get('awayPoints', 0) else 'L'} {game.get('homePoints', 0)}-{game.get('awayPoints', 0)}",
+                    "spread": str(line.get('spread', 0)),
+                    "over_under": line.get('overUnder'),
+                    "week": game.get('week'),
+                    "season": game.get('season')
+                }
+                formatted_entries.append(entry)
             
-            # Create response with betting analysis
-            response = {
-                "summary": enhanced_summary,
-                "formatted_data": formatted_entries,
-                "betting_analysis": betting_analysis
-            }
-            
-            if include_raw_data:
-                response["raw_data"] = data
-            
-            return json.dumps(response, indent=2)
+            return create_formatted_response(raw_data, enhanced_summary, formatted_entries, include_raw_data, output_format)
         
         # Fall back to basic formatting if no betting analysis
         games = data.get("data", {}).get("game", [])
@@ -451,6 +504,7 @@ def safe_format_response(
 ) -> str:
     """
     Safely format response with fallback to raw data on error.
+    Always returns YAML format for optimal token efficiency.
     
     Args:
         raw_data: Raw JSON response
@@ -458,7 +512,7 @@ def safe_format_response(
         include_raw_data: Whether to include raw data
         
     Returns:
-        Formatted response or raw data if formatting fails
+        YAML formatted response or raw data if formatting fails
     """
     formatters = {
         'teams': format_teams_response,
