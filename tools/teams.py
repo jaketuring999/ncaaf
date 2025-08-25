@@ -2,7 +2,7 @@
 Team-related MCP tools for college football data.
 """
 
-from typing import Optional, Union
+from typing import Optional, Union, Annotated
 from fastmcp import Context
 
 # Import from dedicated mcp module to avoid circular imports
@@ -106,7 +106,7 @@ query SearchTeams($searchTerm: String!, $limit: Int) {
 
 @mcp.tool()
 async def GetTeamsSimple(
-    limit: Optional[Union[str, int]] = 50,  # Default to 50 teams to prevent token overflow
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of teams to return (default: 50, can be string or int)"] = 50,
     ctx: Context = None
 ) -> str:
     """
@@ -128,8 +128,8 @@ async def GetTeamsSimple(
 
 @mcp.tool()
 async def GetTeamsByConference(
-    conference: str,
-    limit: Optional[Union[str, int]] = 30,  # Most conferences have ~14 teams, 30 is safe
+    conference: Annotated[str, "Conference name (e.g., 'ACC', 'SEC', 'Big 12')"],
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of teams to return (default: 30, can be string or int)"] = 30,
     ctx: Context = None
 ) -> str:
     """
@@ -149,8 +149,8 @@ async def GetTeamsByConference(
 
 @mcp.tool()
 async def GetTeamDetails(
-    team_id: Optional[Union[str, int]] = None,
-    school_name: Optional[str] = None,
+    team_id: Annotated[Optional[Union[str, int]], "Team ID number (optional, can be string or int)"] = None,
+    school_name: Annotated[Optional[str], "School name to search for (optional, supports partial matches)"] = None,
     ctx: Context = None
 ) -> str:
     """
@@ -180,8 +180,8 @@ async def GetTeamDetails(
 
 @mcp.tool()
 async def SearchTeams(
-    search_term: str,
-    limit: Optional[Union[str, int]] = 20,
+    search_term: Annotated[str, "Text to search for in school names or abbreviations"],
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of results to return (default: 20, can be string or int)"] = 20,
     ctx: Context = None
 ) -> str:
     """

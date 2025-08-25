@@ -2,7 +2,7 @@
 Game-related MCP tools for college football data.
 """
 
-from typing import Optional, Union
+from typing import Optional, Union, Annotated
 from fastmcp import Context
 
 # Import from dedicated mcp module to avoid circular imports
@@ -517,13 +517,13 @@ query GetRecentGames($limit: Int) {
 
 @mcp.tool()
 async def GetGames(
-    season: Optional[Union[str, int]] = None,
-    week: Optional[Union[str, int]] = None,
-    team_id: Optional[Union[str, int]] = None,
-    include_betting_lines: Union[str, bool] = False,
-    include_weather: Union[str, bool] = False,
-    include_media: Union[str, bool] = False,
-    limit: Optional[Union[str, int]] = None,
+    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
+    week: Annotated[Optional[Union[str, int]], "Week number (1-15 for regular season, can be string or int)"] = None,
+    team_id: Annotated[Optional[Union[str, int]], "Get games for specific team (can be string or int)"] = None,
+    include_betting_lines: Annotated[Union[str, bool], "Include betting line information (can be string or bool)"] = False,
+    include_weather: Annotated[Union[str, bool], "Include weather data (can be string or bool)"] = False,
+    include_media: Annotated[Union[str, bool], "Include media/TV information (can be string or bool)"] = False,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     ctx: Context = None
 ) -> str:
     """
@@ -610,9 +610,9 @@ async def GetGames(
 
 @mcp.tool()
 async def GetGamesByWeek(
-    season: Union[str, int],
-    week: Union[str, int],
-    limit: Optional[Union[str, int]] = None,
+    season: Annotated[Union[str, int], "Season year (e.g., 2024 or '2024')"],
+    week: Annotated[Union[str, int], "Week number (1-15 for regular season, can be string or int)"],
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     ctx: Context = None
 ) -> str:
     """
@@ -636,9 +636,9 @@ async def GetGamesByWeek(
 
 @mcp.tool()
 async def GetTeamGames(
-    team_id: Union[str, int],
-    season: Optional[Union[str, int]] = None,
-    limit: Optional[Union[str, int]] = None,
+    team_id: Annotated[Union[str, int], "Team ID number (can be string or int)"],
+    season: Annotated[Optional[Union[str, int]], "Season year (optional, can be string or int)"] = None,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     ctx: Context = None
 ) -> str:
     """
@@ -669,7 +669,7 @@ async def GetTeamGames(
 
 @mcp.tool()
 async def GetRecentGames(
-    limit: Optional[Union[str, int]] = 20,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of recent games to return (default: 20, can be string or int)"] = 20,
     ctx: Context = None
 ) -> str:
     """

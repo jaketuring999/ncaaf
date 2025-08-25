@@ -2,7 +2,7 @@
 Advanced metrics MCP tools for college football data.
 """
 
-from typing import Optional, Union
+from typing import Optional, Union, Annotated
 from fastmcp import Context
 
 # Import from server module at package level
@@ -37,8 +37,8 @@ query GetAdvancedMetrics($teamId: Int, $season: smallint) {
 
 @mcp.tool()
 async def GetAdvancedMetrics(
-    team_id: Optional[Union[str, int]] = None,
-    season: Optional[Union[str, int]] = None,
+    team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
+    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
     ctx: Context = None
 ) -> str:
     """

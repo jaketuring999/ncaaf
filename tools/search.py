@@ -2,7 +2,7 @@
 Search and discovery MCP tools for college football data.
 """
 
-from typing import Optional
+from typing import Optional, Annotated
 from fastmcp import Context
 
 # Import from server module at package level
@@ -30,7 +30,7 @@ query SearchEntities($searchTerm: String!) {
 
 @mcp.tool()
 async def SearchEntities(
-    search_term: str,
+    search_term: Annotated[str, "Text to search for across teams, players, and coaches"],
     ctx: Context = None
 ) -> str:
     """Search across teams, players, and coaches."""

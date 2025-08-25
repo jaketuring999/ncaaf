@@ -2,7 +2,7 @@
 Rankings-related MCP tools for college football data.
 """
 
-from typing import Optional, Union
+from typing import Optional, Union, Annotated
 from fastmcp import Context
 
 # Import from server module at package level
@@ -49,8 +49,8 @@ query GetRankings($season: Int, $week: smallint) {
 
 @mcp.tool()
 async def GetRankings(
-    season: Optional[Union[str, int]] = None,
-    week: Optional[Union[str, int]] = None,
+    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
+    week: Annotated[Optional[Union[str, int]], "Week number (can be string or int)"] = None,
     ctx: Context = None
 ) -> str:
     """
