@@ -14,11 +14,11 @@ from src.graphql_executor import execute_graphql, build_query_variables
 from src.param_processor import preprocess_game_params, safe_int_conversion
 
 # GraphQL queries for game data
-GET_GAMES_QUERY = """
+# Query for games with both season and week
+GET_GAMES_WITH_SEASON_WEEK_QUERY = """
 query GetGames(
-    $season: smallint
-    $week: smallint
-    $teamId: Int
+    $season: smallint!
+    $week: smallint!
     $includeBettingLines: Boolean = false
     $includeWeather: Boolean = false
     $includeMedia: Boolean = false
@@ -29,6 +29,245 @@ query GetGames(
             season: { _eq: $season }
             week: { _eq: $week }
         }
+        orderBy: [
+            { startDate: ASC }
+            { id: ASC }
+        ]
+        limit: $limit
+    ) {
+        id
+        season
+        seasonType
+        week
+        startDate
+        startTimeTbd
+        status
+        neutralSite
+        attendance
+        venueId
+        homePoints
+        awayPoints
+        notes
+        
+        homeTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        awayTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        weather @include(if: $includeWeather) {
+            condition {
+                id
+                description
+            }
+            temperature
+            dewpoint
+            humidity
+            precipitation
+            pressure
+            snowfall
+            windDirection
+            windGust
+            windSpeed
+            weatherConditionCode
+        }
+        
+        mediaInfo @include(if: $includeMedia) {
+            mediaType
+            name
+        }
+        
+        lines @include(if: $includeBettingLines) {
+            spread
+            spreadOpen
+            moneylineHome
+            moneylineAway
+            overUnder
+            overUnderOpen
+        }
+    }
+}
+"""
+
+# Query for games with only season
+GET_GAMES_WITH_SEASON_QUERY = """
+query GetGames(
+    $season: smallint!
+    $includeBettingLines: Boolean = false
+    $includeWeather: Boolean = false
+    $includeMedia: Boolean = false
+    $limit: Int
+) {
+    game(
+        where: {
+            season: { _eq: $season }
+        }
+        orderBy: [
+            { startDate: ASC }
+            { id: ASC }
+        ]
+        limit: $limit
+    ) {
+        id
+        season
+        seasonType
+        week
+        startDate
+        startTimeTbd
+        status
+        neutralSite
+        attendance
+        venueId
+        homePoints
+        awayPoints
+        notes
+        
+        homeTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        awayTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        weather @include(if: $includeWeather) {
+            condition {
+                id
+                description
+            }
+            temperature
+            dewpoint
+            humidity
+            precipitation
+            pressure
+            snowfall
+            windDirection
+            windGust
+            windSpeed
+            weatherConditionCode
+        }
+        
+        mediaInfo @include(if: $includeMedia) {
+            mediaType
+            name
+        }
+        
+        lines @include(if: $includeBettingLines) {
+            spread
+            spreadOpen
+            moneylineHome
+            moneylineAway
+            overUnder
+            overUnderOpen
+        }
+    }
+}
+"""
+
+# Query for games with only week
+GET_GAMES_WITH_WEEK_QUERY = """
+query GetGames(
+    $week: smallint!
+    $includeBettingLines: Boolean = false
+    $includeWeather: Boolean = false
+    $includeMedia: Boolean = false
+    $limit: Int
+) {
+    game(
+        where: {
+            week: { _eq: $week }
+        }
+        orderBy: [
+            { startDate: ASC }
+            { id: ASC }
+        ]
+        limit: $limit
+    ) {
+        id
+        season
+        seasonType
+        week
+        startDate
+        startTimeTbd
+        status
+        neutralSite
+        attendance
+        venueId
+        homePoints
+        awayPoints
+        notes
+        
+        homeTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        awayTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        weather @include(if: $includeWeather) {
+            condition {
+                id
+                description
+            }
+            temperature
+            dewpoint
+            humidity
+            precipitation
+            pressure
+            snowfall
+            windDirection
+            windGust
+            windSpeed
+            weatherConditionCode
+        }
+        
+        mediaInfo @include(if: $includeMedia) {
+            mediaType
+            name
+        }
+        
+        lines @include(if: $includeBettingLines) {
+            spread
+            spreadOpen
+            moneylineHome
+            moneylineAway
+            overUnder
+            overUnderOpen
+        }
+    }
+}
+"""
+
+# Query for all games (no season/week filter)
+GET_ALL_GAMES_QUERY = """
+query GetGames(
+    $includeBettingLines: Boolean = false
+    $includeWeather: Boolean = false
+    $includeMedia: Boolean = false
+    $limit: Int
+) {
+    game(
         orderBy: [
             { startDate: ASC }
             { id: ASC }
@@ -143,15 +382,64 @@ query GetGamesByWeek(
 }
 """
 
-GET_TEAM_GAMES_QUERY = """
+# Query for team games with season filter
+GET_TEAM_GAMES_WITH_SEASON_QUERY = """
 query GetTeamGames(
     $teamId: Int!
-    $season: smallint
+    $season: smallint!
     $limit: Int
 ) {
     game(
         where: {
             season: { _eq: $season }
+            _or: [
+                { homeTeamId: { _eq: $teamId } }
+                { awayTeamId: { _eq: $teamId } }
+            ]
+        }
+        orderBy: [
+            { startDate: ASC }
+            { id: ASC }
+        ]
+        limit: $limit
+    ) {
+        id
+        season
+        seasonType
+        week
+        startDate
+        startTimeTbd
+        status
+        neutralSite
+        attendance
+        homePoints
+        awayPoints
+        
+        homeTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        awayTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+    }
+}
+"""
+
+# Query for team games without season filter
+GET_TEAM_GAMES_QUERY = """
+query GetTeamGames(
+    $teamId: Int!
+    $limit: Int
+) {
+    game(
+        where: {
             _or: [
                 { homeTeamId: { _eq: $teamId } }
                 { awayTeamId: { _eq: $teamId } }
@@ -272,17 +560,53 @@ async def GetGames(
             limit=processed.get('limit')
         )
         return await execute_graphql(GET_TEAM_GAMES_QUERY, variables, ctx)
-    else:
-        # Use regular games query for season/week filtering
+    
+    # Select appropriate query based on which parameters are provided
+    season = processed.get('season')
+    week = processed.get('week')
+    
+    if season is not None and week is not None:
+        # Both season and week provided
+        query = GET_GAMES_WITH_SEASON_WEEK_QUERY
         variables = build_query_variables(
-            season=processed.get('season'),
-            week=processed.get('week'),
+            season=season,
+            week=week,
             includeBettingLines=processed.get('include_betting_lines', False),
             includeWeather=processed.get('include_weather', False),
             includeMedia=processed.get('include_media', False),
             limit=processed.get('limit')
         )
-        return await execute_graphql(GET_GAMES_QUERY, variables, ctx)
+    elif season is not None:
+        # Only season provided
+        query = GET_GAMES_WITH_SEASON_QUERY
+        variables = build_query_variables(
+            season=season,
+            includeBettingLines=processed.get('include_betting_lines', False),
+            includeWeather=processed.get('include_weather', False),
+            includeMedia=processed.get('include_media', False),
+            limit=processed.get('limit')
+        )
+    elif week is not None:
+        # Only week provided
+        query = GET_GAMES_WITH_WEEK_QUERY
+        variables = build_query_variables(
+            week=week,
+            includeBettingLines=processed.get('include_betting_lines', False),
+            includeWeather=processed.get('include_weather', False),
+            includeMedia=processed.get('include_media', False),
+            limit=processed.get('limit')
+        )
+    else:
+        # No season or week filters
+        query = GET_ALL_GAMES_QUERY
+        variables = build_query_variables(
+            includeBettingLines=processed.get('include_betting_lines', False),
+            includeWeather=processed.get('include_weather', False),
+            includeMedia=processed.get('include_media', False),
+            limit=processed.get('limit')
+        )
+    
+    return await execute_graphql(query, variables, ctx)
 
 @mcp.tool()
 async def GetGamesByWeek(
@@ -333,8 +657,15 @@ async def GetTeamGames(
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
     
-    variables = build_query_variables(teamId=team_id_int, season=season_int, limit=limit_int)
-    return await execute_graphql(GET_TEAM_GAMES_QUERY, variables, ctx)
+    # Select appropriate query based on whether season is provided
+    if season_int is not None:
+        query = GET_TEAM_GAMES_WITH_SEASON_QUERY
+        variables = build_query_variables(teamId=team_id_int, season=season_int, limit=limit_int)
+    else:
+        query = GET_TEAM_GAMES_QUERY
+        variables = build_query_variables(teamId=team_id_int, limit=limit_int)
+    
+    return await execute_graphql(query, variables, ctx)
 
 @mcp.tool()
 async def GetRecentGames(
