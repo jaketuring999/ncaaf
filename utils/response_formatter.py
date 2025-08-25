@@ -497,6 +497,91 @@ def format_metrics_response(raw_data: str, include_raw_data: bool = False) -> st
         }, indent=2)
 
 
+def format_generic_graphql_response(raw_data: str, include_raw_data: bool = False) -> str:
+    """
+    Format generic GraphQL response into human-readable summary.
+    
+    Args:
+        raw_data: Raw JSON response from GraphQL query
+        include_raw_data: Whether to include raw data
+        
+    Returns:
+        Formatted YAML response
+    """
+    try:
+        data = json.loads(raw_data)
+        
+        # Handle GraphQL response structure
+        graphql_data = data.get("data", {})
+        errors = data.get("errors", [])
+        
+        # Create summary
+        total_fields = len(graphql_data.keys())
+        total_items = 0
+        field_info = {}
+        
+        for field_name, field_data in graphql_data.items():
+            if isinstance(field_data, list):
+                field_count = len(field_data)
+                total_items += field_count
+                field_info[field_name] = {
+                    "type": "array",
+                    "count": field_count,
+                    "sample_keys": list(field_data[0].keys())[:5] if field_data and isinstance(field_data[0], dict) else []
+                }
+            elif isinstance(field_data, dict):
+                field_info[field_name] = {
+                    "type": "object", 
+                    "keys": list(field_data.keys())[:5]
+                }
+                total_items += 1
+            else:
+                field_info[field_name] = {
+                    "type": type(field_data).__name__,
+                    "value": field_data
+                }
+                total_items += 1
+        
+        summary = {
+            "total_results": total_items,
+            "description": f"GraphQL query returned {total_fields} fields with {total_items} total items",
+            "fields_returned": list(graphql_data.keys()),
+            "field_details": field_info
+        }
+        
+        if errors:
+            summary["errors"] = errors
+        
+        # Create formatted entries - flatten the response for better readability
+        formatted_entries = []
+        
+        for field_name, field_data in graphql_data.items():
+            if isinstance(field_data, list):
+                # Show first 10 items from arrays
+                for i, item in enumerate(field_data[:10]):
+                    entry = {
+                        "field": field_name,
+                        "index": i,
+                        "data": item
+                    }
+                    formatted_entries.append(entry)
+            else:
+                # Single objects or values
+                entry = {
+                    "field": field_name,
+                    "data": field_data
+                }
+                formatted_entries.append(entry)
+        
+        return create_formatted_response(raw_data, summary, formatted_entries, include_raw_data)
+        
+    except Exception as e:
+        return json.dumps({
+            "error": f"Failed to format generic GraphQL response: {str(e)}",
+            "raw_data": raw_data if include_raw_data else None
+        }, indent=2)
+
+
 def safe_format_response(
     raw_data: str, 
     response_type: str, 
@@ -508,7 +593,7 @@ def safe_format_response(
     
     Args:
         raw_data: Raw JSON response
-        response_type: Type of response (teams, games, betting, rankings, athletes, metrics)
+        response_type: Type of response (teams, games, betting, rankings, athletes, metrics, generic)
         include_raw_data: Whether to include raw data
         
     Returns:
@@ -520,7 +605,8 @@ def safe_format_response(
         'betting': format_betting_response,
         'rankings': format_rankings_response,
         'athletes': format_athletes_response,
-        'metrics': format_metrics_response
+        'metrics': format_metrics_response,
+        'generic': format_generic_graphql_response
     }
     
     formatter = formatters.get(response_type)
@@ -528,11 +614,15 @@ def safe_format_response(
         try:
             return formatter(raw_data, include_raw_data)
         except Exception as e:
-            # Fallback to raw data with error message
-            return json.dumps({
-                "error": f"Formatting failed for {response_type}: {str(e)}",
-                "raw_data": json.loads(raw_data) if raw_data else None
-            }, indent=2)
+            # Fallback to generic formatting
+            try:
+                return format_generic_graphql_response(raw_data, include_raw_data)
+            except Exception as fallback_e:
+                # Final fallback to raw data with error message
+                return json.dumps({
+                    "error": f"All formatting failed: {str(e)}, fallback error: {str(fallback_e)}",
+                    "raw_data": json.loads(raw_data) if raw_data else None
+                }, indent=2)
     else:
-        # Unknown response type, return raw data
-        return raw_data
+        # Unknown response type, use generic formatter
+        return format_generic_graphql_response(raw_data, include_raw_data)
