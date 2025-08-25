@@ -3,7 +3,6 @@ Search and discovery MCP tools for college football data.
 """
 
 from typing import Optional, Annotated
-from fastmcp import Context
 
 # Import from server module at package level
 import sys
@@ -30,10 +29,9 @@ query SearchEntities($searchTerm: String!) {
 
 @mcp.tool()
 async def SearchEntities(
-    search_term: Annotated[str, "Text to search for across teams, players, and coaches"],
-    ctx: Context = None
+    search_term: Annotated[str, "Text to search for across teams, players, and coaches"]
 ) -> str:
     """Search across teams, players, and coaches."""
     search_pattern = f"%{search_term}%"
     variables = build_query_variables(searchTerm=search_pattern)
-    return await execute_graphql(SEARCH_ENTITIES_QUERY, variables, ctx)
+    return await execute_graphql(SEARCH_ENTITIES_QUERY, variables)

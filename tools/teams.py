@@ -5,7 +5,6 @@ Consolidated team tools with flexible filtering and optional enhancements.
 """
 
 from typing import Optional, Union, Annotated
-from fastmcp import Context
 
 # Import from dedicated mcp module to avoid circular imports
 import sys
@@ -154,8 +153,7 @@ async def GetTeams(
     include_roster: Annotated[Union[str, bool], "Include current roster information (default: false)"] = False,
     include_coaching: Annotated[Union[str, bool], "Include coaching staff details (default: false)"] = False,
     include_facilities: Annotated[Union[str, bool], "Include stadium and facility information (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get college football teams with flexible filtering and optional enhancements.
@@ -203,31 +201,31 @@ async def GetTeams(
         search_pattern = format_search_pattern(params['search'])
         variables = build_query_variables(searchTerm=search_pattern, limit=params['limit'])
         query = SEARCH_TEAMS_QUERY
-        await ctx.info(f"Searching teams with pattern: {params['search']}")
+        pass  # Searching teams with pattern
     elif params.get('conference'):
         # Conference filter
         variables = build_query_variables(conference=params['conference'], limit=params['limit'])
         query = GET_TEAMS_BY_CONFERENCE_QUERY
-        await ctx.info(f"Fetching teams from conference: {params['conference']}")
+        pass  # Fetching teams from conference
     elif params.get('division'):
         # Division filter
         variables = build_query_variables(division=params['division'], limit=params['limit'])
         query = GET_TEAMS_BY_DIVISION_QUERY
-        await ctx.info(f"Fetching teams from division: {params['division']}")
+        pass  # Fetching teams from division
     else:
         # All teams
         variables = build_query_variables(limit=params['limit'])
         query = GET_TEAMS_ALL_QUERY
-        await ctx.info(f"Fetching all teams (limit: {params['limit']})")
+        pass  # Fetching all teams
     
     # Execute the GraphQL query
-    result = await execute_graphql(query, variables, ctx)
+    result = await execute_graphql(query, variables)
     
     # Future enhancement: Add additional data based on include_* flags
     # This is where we would enhance the response with records, roster, etc.
     if any([params['include_records'], params['include_roster'], 
             params['include_coaching'], params['include_facilities']]):
-        await ctx.info("Enhancement flags detected - future feature")
+        pass  # Enhancement flags detected - future feature
         # TODO: Implement enhancements using utils functions
     
     # Format response based on include_raw_data flag
@@ -240,8 +238,7 @@ async def GetTeams(
 async def GetTeamDetails(
     team_id: Annotated[Optional[Union[str, int]], "Team ID number (optional, can be string or int)"] = None,
     school_name: Annotated[Optional[str], "School name to search for (optional, supports partial matches)"] = None,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get detailed information for a specific team.
@@ -267,14 +264,14 @@ async def GetTeamDetails(
     # Use different queries based on which parameter is provided
     if team_id_int:
         variables = build_query_variables(teamId=team_id_int)
-        result = await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_ID, variables, ctx)
-        await ctx.info(f"Fetching team details by ID: {team_id_int}")
+        result = await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_ID, variables)
+        pass  # Fetching team details by ID
     else:
         # Format school name for partial matching
         school_pattern = f"%{school_name_clean}%"
         variables = build_query_variables(school=school_pattern)
-        result = await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_NAME, variables, ctx)
-        await ctx.info(f"Fetching team details by name: {school_name_clean}")
+        result = await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_NAME, variables)
+        pass  # Fetching team details by name
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:
@@ -286,8 +283,7 @@ async def GetTeamDetails(
 async def SearchTeams(
     search_term: Annotated[str, "Text to search for in school names or abbreviations"],
     limit: Annotated[Optional[Union[str, int]], "Maximum number of results to return (default: 20, can be string or int)"] = 20,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Search for teams by school name or abbreviation.
@@ -306,9 +302,9 @@ async def SearchTeams(
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(searchTerm=search_pattern, limit=limit_int)
-    result = await execute_graphql(SEARCH_TEAMS_QUERY, variables, ctx)
+    result = await execute_graphql(SEARCH_TEAMS_QUERY, variables)
     
-    await ctx.info(f"Searching teams with term: '{search_term}' (limit: {limit_int})")
+    pass  # Searching teams with term
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:

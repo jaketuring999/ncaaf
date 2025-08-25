@@ -8,7 +8,6 @@ import re
 import json
 from typing import Optional, Dict, List, Any, Tuple, Union, Annotated
 from pathlib import Path
-from fastmcp import Context
 
 # Import from dedicated mcp module
 import sys
@@ -319,8 +318,7 @@ async def SchemaExplorer(
     offset: Annotated[Optional[Union[str, int]], "Pagination offset (default: 0)"] = 0,
     include_fields: Annotated[Union[str, bool], "Include field details in results"] = False,
     exclude_aggregates: Annotated[Union[str, bool], "Exclude aggregate helper types (default: True)"] = True,
-    use_regex: Annotated[Union[str, bool], "Use regex for search operation (default: False)"] = False,
-    ctx: Context = None
+    use_regex: Annotated[Union[str, bool], "Use regex for search operation (default: False)"] = False
 ) -> str:
     """
     Unified schema exploration tool for NCAAF GraphQL API.
@@ -359,8 +357,7 @@ async def SchemaExplorer(
             if not query:
                 return json.dumps({"error": "Query parameter required for search operation"})
             
-            if ctx:
-                await ctx.info(f"Searching schema for: {query}")
+            pass  # Schema search
             
             results = parser.search(query, use_regex, exclude_aggregates)
             
@@ -398,8 +395,7 @@ async def SchemaExplorer(
             }, indent=2)
         
         elif operation == "types":
-            if ctx:
-                await ctx.info(f"Getting types (kind={kind}, exclude_aggregates={exclude_aggregates})")
+            pass  # Getting types
             
             results = parser.get_types(kind, exclude_aggregates)
             
@@ -435,8 +431,7 @@ async def SchemaExplorer(
             }, indent=2)
         
         elif operation == "fields":
-            if ctx:
-                await ctx.info("Getting query fields")
+            pass  # Getting query fields
             
             fields = list(parser.query_fields.values())
             
@@ -467,8 +462,7 @@ async def SchemaExplorer(
             if not query:
                 return json.dumps({"error": "Query parameter (type name) required for details operation"})
             
-            if ctx:
-                await ctx.info(f"Getting details for type: {query}")
+            pass  # Getting type details
             
             type_info = parser.get_type_details(query)
             
@@ -481,8 +475,7 @@ async def SchemaExplorer(
             }, indent=2)
         
         elif operation == "stats":
-            if ctx:
-                await ctx.info("Getting schema statistics")
+            pass  # Getting schema stats
             
             stats = parser.get_stats()
             
@@ -498,45 +491,7 @@ async def SchemaExplorer(
             })
     
     except Exception as e:
-        if ctx:
-            await ctx.error(f"SchemaExplorer error: {e}")
+        pass  # Error handling
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-async def execute_query(
-    query: Annotated[str, "GraphQL query string"],
-    variables: Annotated[Optional[dict], "Optional variables dictionary"] = None,
-    ctx: Context = None
-) -> str:
-    """
-    Execute a GraphQL query against the college football database.
-    Power-user tool for advanced queries not covered by specialized tools.
-    
-    Args:
-        query: GraphQL query string
-        variables: Optional variables dictionary
-    
-    Returns:
-        JSON string containing the query results
-    """
-    from src.graphql_executor import execute_graphql
-    
-    try:
-        if ctx:
-            await ctx.info("Executing custom GraphQL query")
-        
-        if not query:
-            return json.dumps({"error": "Query is required"})
-        
-        # Execute the query
-        if variables is None:
-            variables = {}
-        result = await execute_graphql(query, variables, ctx)
-        
-        return result
-        
-    except Exception as e:
-        if ctx:
-            await ctx.error(f"Query execution error: {e}")
-        return json.dumps({"error": str(e)})

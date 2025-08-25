@@ -3,7 +3,6 @@ Betting-related MCP tools for college football data.
 """
 
 from typing import Optional, Union, Annotated
-from fastmcp import Context
 
 # Import from server module at package level
 import sys
@@ -308,8 +307,7 @@ async def GetBettingLines(
     team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (default: 50, can be string or int)"] = 50,
     calculate_records: Annotated[Union[str, bool], "Calculate ATS, Over/Under, and SU records (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get betting lines for games.
@@ -370,7 +368,7 @@ async def GetBettingLines(
         variables = build_query_variables(limit=limit_int)
     
     # Execute the GraphQL query
-    result = await execute_graphql(query, variables, ctx)
+    result = await execute_graphql(query, variables)
     
     # Add betting analysis if requested and we have a team_id
     if calculate_records_bool and team_id_int:
@@ -399,8 +397,7 @@ async def GetBettingLines(
                 
         except Exception as e:
             # Don't fail the main query if betting analysis fails
-            if ctx:
-                await ctx.warning(f"Could not calculate betting analysis: {e}")
+            pass  # Don't fail the main query if betting analysis fails
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:

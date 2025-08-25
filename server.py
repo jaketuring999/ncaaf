@@ -8,9 +8,9 @@ A simple GraphQL wrapper for college football data with MCP protocol support.
 
 import json
 import logging
+from typing import Union, Optional, Dict, Any
 from dotenv import load_dotenv
 
-from fastmcp import Context
 from pydantic import ValidationError
 
 # Load environment variables from .env file
@@ -38,40 +38,47 @@ import tools
 # MCP Tools
 # =============================================================================
 
+# GraphQL query execution tool
 @mcp.tool()
-async def execute_query(query_input: QueryInput, ctx: Context) -> str:
+async def execute_query(
+    query: str,
+    variables: Optional[Dict[str, Any]] = None,
+    operation_name: Optional[str] = None
+) -> str:
     """
     Execute a GraphQL query against the college football database.
-    Includes automatic query validation and security checks.
+    Alternative version with individual parameters instead of a model.
     
     Args:
-        query_input: GraphQL query with optional variables and operation name
+        query: GraphQL query string
+        variables: Query variables dictionary
+        operation_name: Operation name (optional)
     
     Returns:
         JSON string containing the query results
     """
     try:
-        await ctx.info(f"Executing GraphQL query: {query_input.operation_name or 'unnamed'}")
+        # Validate using QueryInput model internally
+        query_input = QueryInput(
+            query=query,
+            variables=variables or {},
+            operation_name=operation_name
+        )
         
         result = await execute_graphql(
             query_input.query,
-            query_input.variables,
-            ctx
+            query_input.variables
         )
         
-        await ctx.info("Query executed successfully")
         return result
     
     except ValidationError as e:
-        await ctx.error(f"Validation error: {e}")
         return json.dumps({"error": "Invalid input", "details": str(e)})
     
     except GraphQLError as e:
-        await ctx.error(f"GraphQL error: {e}")
         return json.dumps({"error": str(e), "query": e.query[:100] if e.query else None})
     
     except Exception as e:
-        await ctx.error(f"Unexpected error: {e}")
         return json.dumps({"error": f"Unexpected error: {str(e)}"})
 
 

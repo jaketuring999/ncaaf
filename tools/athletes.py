@@ -3,7 +3,6 @@ Athlete/Player-related MCP tools for college football data.
 """
 
 from typing import Optional, Union, Annotated
-from fastmcp import Context
 
 # Import from server module at package level
 import sys
@@ -90,8 +89,7 @@ query GetAthletes($teamId: Int) {
 async def GetAthletes(
     team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get athlete information for a team.
@@ -117,7 +115,7 @@ async def GetAthletes(
         query = GET_ATHLETES_QUERY_NO_SEASON
         variables = build_query_variables(teamId=team_id_int)
     
-    result = await execute_graphql(query, variables, ctx)
+    result = await execute_graphql(query, variables)
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:

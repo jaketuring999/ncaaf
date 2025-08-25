@@ -3,7 +3,6 @@ Game-related MCP tools for college football data.
 """
 
 from typing import Optional, Union, Annotated
-from fastmcp import Context
 
 # Import from dedicated mcp module to avoid circular imports
 import sys
@@ -527,8 +526,7 @@ async def GetGames(
     include_media: Annotated[Union[str, bool], "Include media/TV information (can be string or bool)"] = False,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     calculate_stats: Annotated[Union[str, bool], "Calculate game statistics and trends (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get games with flexible filtering options.
@@ -569,7 +567,7 @@ async def GetGames(
             season=processed.get('season'),
             limit=processed.get('limit')
         )
-        return await execute_graphql(GET_TEAM_GAMES_QUERY, variables, ctx)
+        return await execute_graphql(GET_TEAM_GAMES_QUERY, variables)
     
     # Select appropriate query based on which parameters are provided
     season = processed.get('season')
@@ -617,7 +615,7 @@ async def GetGames(
         )
     
     # Execute the GraphQL query
-    result = await execute_graphql(query, variables, ctx)
+    result = await execute_graphql(query, variables)
     
     # Add game statistics if requested
     if calculate_stats_bool:
@@ -645,8 +643,7 @@ async def GetGames(
                 
         except Exception as e:
             # Don't fail the main query if statistics calculation fails
-            if ctx:
-                await ctx.warning(f"Could not calculate game statistics: {e}")
+            pass
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:
@@ -660,8 +657,7 @@ async def GetGamesByWeek(
     week: Annotated[Union[str, int], "Week number (1-15 for regular season, can be string or int)"],
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     calculate_weekly_trends: Annotated[Union[str, bool], "Calculate weekly betting and scoring trends (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get all games for a specific week and season.
@@ -686,7 +682,7 @@ async def GetGamesByWeek(
     variables = build_query_variables(season=season_int, week=week_int, limit=limit_int)
     
     # Execute the GraphQL query
-    result = await execute_graphql(GET_GAMES_BY_WEEK_QUERY, variables, ctx)
+    result = await execute_graphql(GET_GAMES_BY_WEEK_QUERY, variables)
     
     # Add weekly trends analysis if requested
     if calculate_weekly_trends_bool:
@@ -714,8 +710,7 @@ async def GetGamesByWeek(
                 
         except Exception as e:
             # Don't fail the main query if trends calculation fails
-            if ctx:
-                await ctx.warning(f"Could not calculate weekly trends: {e}")
+            pass
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:
@@ -729,8 +724,7 @@ async def GetTeamGames(
     season: Annotated[Optional[Union[str, int]], "Season year (optional, can be string or int)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     calculate_performance: Annotated[Union[str, bool], "Calculate team performance metrics (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get all games for a specific team.
@@ -761,7 +755,7 @@ async def GetTeamGames(
         variables = build_query_variables(teamId=team_id_int, limit=limit_int)
     
     # Execute the GraphQL query
-    result = await execute_graphql(query, variables, ctx)
+    result = await execute_graphql(query, variables)
     
     # Add team performance analysis if requested
     if calculate_performance_bool:
@@ -789,8 +783,7 @@ async def GetTeamGames(
                 
         except Exception as e:
             # Don't fail the main query if performance analysis fails
-            if ctx:
-                await ctx.warning(f"Could not calculate team performance: {e}")
+            pass
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:
@@ -801,8 +794,7 @@ async def GetTeamGames(
 @mcp.tool()
 async def GetRecentGames(
     limit: Annotated[Optional[Union[str, int]], "Maximum number of recent games to return (default: 20, can be string or int)"] = 20,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get recently completed games.
@@ -819,7 +811,7 @@ async def GetRecentGames(
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(limit=limit_int)
-    result = await execute_graphql(GET_RECENT_GAMES_QUERY, variables, ctx)
+    result = await execute_graphql(GET_RECENT_GAMES_QUERY, variables)
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:

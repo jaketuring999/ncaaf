@@ -3,7 +3,6 @@ Rankings-related MCP tools for college football data.
 """
 
 from typing import Optional, Union, Annotated
-from fastmcp import Context
 
 # Import from server module at package level
 import sys
@@ -54,8 +53,7 @@ async def GetRankings(
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
     week: Annotated[Optional[Union[str, int]], "Week number (can be string or int)"] = None,
     calculate_movement: Annotated[Union[str, bool], "Calculate ranking movement and trends (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get college football rankings for a specific season and week.
@@ -78,7 +76,7 @@ async def GetRankings(
     variables = build_query_variables(season=season_int, week=week_int)
     
     # Execute the GraphQL query
-    result = await execute_graphql(GET_RANKINGS_QUERY, variables, ctx)
+    result = await execute_graphql(GET_RANKINGS_QUERY, variables)
     
     # Add ranking movement analysis if requested
     if calculate_movement_bool:
@@ -107,8 +105,7 @@ async def GetRankings(
                 
         except Exception as e:
             # Don't fail the main query if ranking analysis fails
-            if ctx:
-                await ctx.warning(f"Could not calculate ranking analysis: {e}")
+            pass  # Don't fail the main query if ranking analysis fails
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:

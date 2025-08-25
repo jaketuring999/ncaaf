@@ -166,8 +166,8 @@ def format_games_response(raw_data: str, include_raw_data: bool = False) -> str:
         # Create formatted entries
         formatted_entries = []
         for game in games:
-            home_team = game.get("homeTeamInfo", {})
-            away_team = game.get("awayTeamInfo", {})
+            home_team = game.get("homeTeamInfo") or {}
+            away_team = game.get("awayTeamInfo") or {}
             
             entry = {
                 "game_id": game.get("id"),
@@ -230,8 +230,8 @@ def format_betting_response(raw_data: str, include_raw_data: bool = False) -> st
                 ]):
                     continue
                     
-                home_team_info = game.get('homeTeamInfo', {})
-                away_team_info = game.get('awayTeamInfo', {})
+                home_team_info = game.get('homeTeamInfo') or {}
+                away_team_info = game.get('awayTeamInfo') or {}
                 line = game['lines'][0]  # Use first betting line
                 
                 # Determine which team we're analyzing (based on betting_summary context)
@@ -246,7 +246,7 @@ def format_betting_response(raw_data: str, include_raw_data: bool = False) -> st
                 }
                 formatted_entries.append(entry)
             
-            return create_formatted_response(raw_data, enhanced_summary, formatted_entries, include_raw_data, output_format)
+            return create_formatted_response(raw_data, enhanced_summary, formatted_entries, include_raw_data)
         
         # Fall back to basic formatting if no betting analysis
         games = data.get("data", {}).get("game", [])
@@ -280,8 +280,8 @@ def format_betting_response(raw_data: str, include_raw_data: bool = False) -> st
         # Create formatted entries
         formatted_entries = []
         for game in games:
-            home_team = game.get("homeTeamInfo", {})
-            away_team = game.get("awayTeamInfo", {})
+            home_team = game.get("homeTeamInfo") or {}
+            away_team = game.get("awayTeamInfo") or {}
             lines = game.get("lines", [])
             
             line_info = "No lines available"

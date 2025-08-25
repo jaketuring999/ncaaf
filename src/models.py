@@ -13,31 +13,6 @@ class GraphQLError(Exception):
         self.query = query
         self.status_code = status_code
 
-
-class ServerConfig(BaseModel):
-    """Server configuration with validation"""
-    endpoint: str = Field(..., description="GraphQL endpoint URL")
-    headers: Dict[str, str] = Field(default_factory=dict, description="Request headers")
-    timeout: int = Field(30, description="Request timeout in seconds")
-    max_retries: int = Field(3, description="Maximum retry attempts")
-    cache_ttl: int = Field(300, description="Cache TTL in seconds")
-    rate_limit: int = Field(100, description="Requests per minute limit")
-    
-    @field_validator('endpoint')
-    @classmethod
-    def validate_endpoint(cls, v):
-        if not v.startswith(('http://', 'https://')):
-            raise ValueError('Endpoint must be a valid HTTP/HTTPS URL')
-        return v
-    
-    @field_validator('timeout')
-    @classmethod
-    def validate_timeout(cls, v):
-        if v <= 0 or v > 300:
-            raise ValueError('Timeout must be between 1 and 300 seconds')
-        return v
-
-
 class QueryInput(BaseModel):
     """GraphQL query input validation"""
     query: str = Field(..., min_length=1, description="GraphQL query string")

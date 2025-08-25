@@ -3,7 +3,6 @@ Advanced metrics MCP tools for college football data.
 """
 
 from typing import Optional, Union, Annotated
-from fastmcp import Context
 
 # Import from server module at package level
 import sys
@@ -41,8 +40,7 @@ query GetAdvancedMetrics($teamId: Int, $season: smallint) {
 async def GetAdvancedMetrics(
     team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
-    ctx: Context = None
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
     Get advanced team metrics.
@@ -61,7 +59,7 @@ async def GetAdvancedMetrics(
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(teamId=team_id_int, season=season_int)
-    result = await execute_graphql(GET_ADVANCED_METRICS_QUERY, variables, ctx)
+    result = await execute_graphql(GET_ADVANCED_METRICS_QUERY, variables)
     
     # Format response based on include_raw_data flag
     if include_raw_data_bool:
