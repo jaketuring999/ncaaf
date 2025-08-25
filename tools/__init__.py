@@ -12,6 +12,7 @@ from . import betting
 from . import athletes
 from . import search
 from . import metrics
+from . import schema
 
 __all__ = [
     'teams',
@@ -20,5 +21,6 @@ __all__ = [
     'betting',
     'athletes',
     'search',
-    'metrics'
+    'metrics',
+    'schema'
 ]
