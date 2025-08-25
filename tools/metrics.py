@@ -2,7 +2,7 @@
 Advanced metrics MCP tools for college football data.
 """
 
-from typing import Optional
+from typing import Optional, Union
 from fastmcp import Context
 
 # Import from server module at package level
@@ -11,6 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from src.mcp_server import mcp
 from src.graphql_executor import execute_graphql, build_query_variables
+from src.param_processor import safe_int_conversion
 
 # Placeholder - will implement later
 GET_ADVANCED_METRICS_QUERY = """
@@ -36,10 +37,23 @@ query GetAdvancedMetrics($teamId: Int, $season: smallint) {
 
 @mcp.tool()
 async def GetAdvancedMetrics(
-    team_id: Optional[int] = None,
-    season: Optional[int] = None,
+    team_id: Optional[Union[str, int]] = None,
+    season: Optional[Union[str, int]] = None,
     ctx: Context = None
 ) -> str:
-    """Get advanced team metrics."""
-    variables = build_query_variables(teamId=team_id, season=season)
+    """
+    Get advanced team metrics.
+    
+    Args:
+        team_id: Team ID (can be string or int)
+        season: Season year (e.g., 2024 or "2024")
+    
+    Returns:
+        JSON string with advanced metrics data
+    """
+    # Convert string inputs to integers
+    team_id_int = safe_int_conversion(team_id, 'team_id') if team_id is not None else None
+    season_int = safe_int_conversion(season, 'season') if season is not None else None
+    
+    variables = build_query_variables(teamId=team_id_int, season=season_int)
     return await execute_graphql(GET_ADVANCED_METRICS_QUERY, variables, ctx)

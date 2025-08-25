@@ -2,7 +2,7 @@
 Game-related MCP tools for college football data.
 """
 
-from typing import Optional
+from typing import Optional, Union
 from fastmcp import Context
 
 # Import from dedicated mcp module to avoid circular imports
@@ -11,6 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from src.mcp_server import mcp
 from src.graphql_executor import execute_graphql, build_query_variables
+from src.param_processor import preprocess_game_params, safe_int_conversion
 
 # GraphQL queries for game data
 GET_GAMES_QUERY = """
@@ -25,16 +26,8 @@ query GetGames(
 ) {
     game(
         where: {
-            _and: [
-                { season: { _eq: $season } }
-                { week: { _eq: $week } }
-                {
-                    _or: [
-                        { homeTeamId: { _eq: $teamId } }
-                        { awayTeamId: { _eq: $teamId } }
-                    ]
-                }
-            ]
+            season: { _eq: $season }
+            week: { _eq: $week }
         }
         orderBy: [
             { startDate: ASC }
@@ -158,14 +151,10 @@ query GetTeamGames(
 ) {
     game(
         where: {
-            _and: [
-                { season: { _eq: $season } }
-                {
-                    _or: [
-                        { homeTeamId: { _eq: $teamId } }
-                        { awayTeamId: { _eq: $teamId } }
-                    ]
-                }
+            season: { _eq: $season }
+            _or: [
+                { homeTeamId: { _eq: $teamId } }
+                { awayTeamId: { _eq: $teamId } }
             ]
         }
         orderBy: [
@@ -207,7 +196,7 @@ GET_RECENT_GAMES_QUERY = """
 query GetRecentGames($limit: Int) {
     game(
         where: {
-            status: { _in: ["completed", "final"] }
+            status: { _eq: "completed" }
         }
         orderBy: { startDate: DESC }
         limit: $limit
@@ -240,96 +229,129 @@ query GetRecentGames($limit: Int) {
 
 @mcp.tool()
 async def GetGames(
-    season: Optional[int] = None,
-    week: Optional[int] = None,
-    team_id: Optional[int] = None,
-    include_betting_lines: bool = False,
-    include_weather: bool = False,
-    include_media: bool = False,
-    limit: Optional[int] = None,
+    season: Optional[Union[str, int]] = None,
+    week: Optional[Union[str, int]] = None,
+    team_id: Optional[Union[str, int]] = None,
+    include_betting_lines: Union[str, bool] = False,
+    include_weather: Union[str, bool] = False,
+    include_media: Union[str, bool] = False,
+    limit: Optional[Union[str, int]] = None,
     ctx: Context = None
 ) -> str:
     """
     Get games with flexible filtering options.
     
     Args:
-        season: Season year (e.g., 2024)
-        week: Week number (1-15 for regular season)
-        team_id: Get games for specific team
-        include_betting_lines: Include betting line information
-        include_weather: Include weather data
-        include_media: Include media/TV information
-        limit: Maximum number of games to return
+        season: Season year (e.g., 2024 or "2024")
+        week: Week number (1-15 for regular season, can be string or int)
+        team_id: Get games for specific team (can be string or int)
+        include_betting_lines: Include betting line information (can be string or bool)
+        include_weather: Include weather data (can be string or bool)
+        include_media: Include media/TV information (can be string or bool)
+        limit: Maximum number of games to return (can be string or int)
     
     Returns:
         JSON string with game information
     """
-    variables = build_query_variables(
+    # Preprocess parameters to handle string inputs
+    processed = preprocess_game_params(
         season=season,
         week=week,
-        teamId=team_id,
-        includeBettingLines=include_betting_lines,
-        includeWeather=include_weather,
-        includeMedia=include_media,
-        limit=limit
+        team_id=team_id,
+        limit=limit,
+        include_betting_lines=include_betting_lines,
+        include_weather=include_weather,
+        include_media=include_media
     )
-    return await execute_graphql(GET_GAMES_QUERY, variables, ctx)
+    
+    # If team_id is provided, use the team games query to avoid null issues
+    if processed.get('team_id'):
+        variables = build_query_variables(
+            teamId=processed.get('team_id'),
+            season=processed.get('season'),
+            limit=processed.get('limit')
+        )
+        return await execute_graphql(GET_TEAM_GAMES_QUERY, variables, ctx)
+    else:
+        # Use regular games query for season/week filtering
+        variables = build_query_variables(
+            season=processed.get('season'),
+            week=processed.get('week'),
+            includeBettingLines=processed.get('include_betting_lines', False),
+            includeWeather=processed.get('include_weather', False),
+            includeMedia=processed.get('include_media', False),
+            limit=processed.get('limit')
+        )
+        return await execute_graphql(GET_GAMES_QUERY, variables, ctx)
 
 @mcp.tool()
 async def GetGamesByWeek(
-    season: int,
-    week: int,
-    limit: Optional[int] = None,
+    season: Union[str, int],
+    week: Union[str, int],
+    limit: Optional[Union[str, int]] = None,
     ctx: Context = None
 ) -> str:
     """
     Get all games for a specific week and season.
     
     Args:
-        season: Season year (e.g., 2024)
-        week: Week number (1-15 for regular season)
-        limit: Maximum number of games to return
+        season: Season year (e.g., 2024 or "2024")
+        week: Week number (1-15 for regular season, can be string or int)
+        limit: Maximum number of games to return (can be string or int)
     
     Returns:
         JSON string with games for the specified week
     """
-    variables = build_query_variables(season=season, week=week, limit=limit)
+    # Convert string inputs to integers
+    season_int = safe_int_conversion(season, 'season')
+    week_int = safe_int_conversion(week, 'week')
+    limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
+    
+    variables = build_query_variables(season=season_int, week=week_int, limit=limit_int)
     return await execute_graphql(GET_GAMES_BY_WEEK_QUERY, variables, ctx)
 
 @mcp.tool()
 async def GetTeamGames(
-    team_id: int,
-    season: Optional[int] = None,
-    limit: Optional[int] = None,
+    team_id: Union[str, int],
+    season: Optional[Union[str, int]] = None,
+    limit: Optional[Union[str, int]] = None,
     ctx: Context = None
 ) -> str:
     """
     Get all games for a specific team.
     
     Args:
-        team_id: Team ID number
-        season: Season year (optional, defaults to current season)
-        limit: Maximum number of games to return
+        team_id: Team ID number (can be string or int)
+        season: Season year (optional, can be string or int)
+        limit: Maximum number of games to return (can be string or int)
     
     Returns:
         JSON string with team's games
     """
-    variables = build_query_variables(teamId=team_id, season=season, limit=limit)
+    # Convert string inputs to integers
+    team_id_int = safe_int_conversion(team_id, 'team_id')
+    season_int = safe_int_conversion(season, 'season') if season is not None else None
+    limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
+    
+    variables = build_query_variables(teamId=team_id_int, season=season_int, limit=limit_int)
     return await execute_graphql(GET_TEAM_GAMES_QUERY, variables, ctx)
 
 @mcp.tool()
 async def GetRecentGames(
-    limit: Optional[int] = 20,
+    limit: Optional[Union[str, int]] = 20,
     ctx: Context = None
 ) -> str:
     """
     Get recently completed games.
     
     Args:
-        limit: Maximum number of recent games to return (default: 20)
+        limit: Maximum number of recent games to return (default: 20, can be string or int)
     
     Returns:
         JSON string with recently completed games
     """
-    variables = build_query_variables(limit=limit)
+    # Convert string input to integer
+    limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 20
+    
+    variables = build_query_variables(limit=limit_int)
     return await execute_graphql(GET_RECENT_GAMES_QUERY, variables, ctx)

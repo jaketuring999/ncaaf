@@ -11,9 +11,13 @@ import json
 import logging
 import time
 from typing import Optional
+from dotenv import load_dotenv
 
 from fastmcp import FastMCP, Context
 from pydantic import ValidationError
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import our organized modules
 from src.models import QueryInput, GraphQLError
@@ -21,9 +25,6 @@ from src.server_state import ServerState
 from src.graphql import format_graphql_type, validate_basic_query_syntax
 from src.async_utils import generate_request_id
 from src.graphql_executor import set_server_state
-
-# Import tool modules to register their @mcp.tool decorators
-import tools
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +36,13 @@ logger = logging.getLogger(__name__)
 # Import the shared MCP server instance and initialize global state
 from src.mcp_server import mcp
 server_state = ServerState()
+
+# Initialize server state for GraphQL executor immediately
+set_server_state(server_state)
+
+# Import tool modules to register their @mcp.tool decorators
+# This must come AFTER setting server_state so tools have access to it
+import tools
 
 
 # =============================================================================
@@ -418,11 +426,8 @@ Please provide a complete GraphQL query with variables if needed."""
 # =============================================================================
 
 if __name__ == "__main__":
-    # Initialize server state for GraphQL executor
-    set_server_state(server_state)
-    
     logger.info("Starting College Football GraphQL MCP Server with HTTP transport...")
-    logger.info("Server will be available at http://localhost:8000/mcp")
+    logger.info("Server will be available at http://127.0.0.1:8345/mcp")
     try:
         mcp.run(transport="streamable-http", host="0.0.0.0", port=8345)
     except KeyboardInterrupt:
