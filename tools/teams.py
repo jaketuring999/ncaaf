@@ -1,5 +1,7 @@
 """
 Team-related MCP tools for college football data.
+
+Consolidated team tools with flexible filtering and optional enhancements.
 """
 
 from typing import Optional, Union, Annotated
@@ -10,12 +12,31 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
-from src.graphql_executor import execute_graphql, build_query_variables
-from src.param_processor import safe_int_conversion
+from src.graphql_executor import execute_graphql
+from utils.param_utils import preprocess_team_params, validate_team_lookup_params, safe_int_conversion, safe_string_conversion
+from utils.graphql_utils import build_query_variables, format_search_pattern
 
-# GraphQL queries defined as Python strings
-GET_TEAMS_SIMPLE_QUERY = """
-query GetTeamsSimple($limit: Int) {
+# GraphQL queries for team operations
+GET_TEAMS_QUERY = """
+query GetTeams($conference: String, $division: String, $search: String, $limit: Int) {
+    currentTeams(
+        where: {where_clause}
+        orderBy: { school: ASC }
+        limit: $limit
+    ) {
+        teamId
+        school
+        conference
+        conferenceId
+        division
+        classification
+        abbreviation
+    }
+}
+"""
+
+GET_TEAMS_ALL_QUERY = """
+query GetTeamsAll($limit: Int) {
     currentTeams(
         orderBy: { school: ASC }
         limit: $limit
@@ -35,6 +56,47 @@ GET_TEAMS_BY_CONFERENCE_QUERY = """
 query GetTeamsByConference($conference: String!, $limit: Int) {
     currentTeams(
         where: { conference: { _eq: $conference } }
+        orderBy: { school: ASC }
+        limit: $limit
+    ) {
+        teamId
+        school
+        conference
+        conferenceId
+        division
+        classification
+        abbreviation
+    }
+}
+"""
+
+GET_TEAMS_BY_DIVISION_QUERY = """
+query GetTeamsByDivision($division: String!, $limit: Int) {
+    currentTeams(
+        where: { division: { _eq: $division } }
+        orderBy: { school: ASC }
+        limit: $limit
+    ) {
+        teamId
+        school
+        conference
+        conferenceId
+        division
+        classification
+        abbreviation
+    }
+}
+"""
+
+SEARCH_TEAMS_QUERY = """
+query SearchTeams($searchTerm: String!, $limit: Int) {
+    currentTeams(
+        where: {
+            _or: [
+                { school: { _ilike: $searchTerm } }
+                { abbreviation: { _ilike: $searchTerm } }
+            ]
+        }
         orderBy: { school: ASC }
         limit: $limit
     ) {
@@ -81,71 +143,89 @@ query GetTeamDetailsByName($school: String!) {
 }
 """
 
-SEARCH_TEAMS_QUERY = """
-query SearchTeams($searchTerm: String!, $limit: Int) {
-    currentTeams(
-        where: {
-            _or: [
-                { school: { _ilike: $searchTerm } }
-                { abbreviation: { _ilike: $searchTerm } }
-            ]
-        }
-        orderBy: { school: ASC }
-        limit: $limit
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
-
 @mcp.tool()
-async def GetTeamsSimple(
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of teams to return (default: 50, can be string or int)"] = 50,
+async def GetTeams(
+    conference: Annotated[Optional[str], "Conference name filter (e.g., 'ACC', 'SEC', 'Big 12')"] = None,
+    division: Annotated[Optional[str], "Division name filter (e.g., 'FBS', 'FCS')"] = None,
+    search: Annotated[Optional[str], "Search teams by name or abbreviation"] = None,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of teams to return (default: 100, can be string or int)"] = 100,
+    include_records: Annotated[Union[str, bool], "Include team records and season statistics (default: false)"] = False,
+    include_roster: Annotated[Union[str, bool], "Include current roster information (default: false)"] = False,
+    include_coaching: Annotated[Union[str, bool], "Include coaching staff details (default: false)"] = False,
+    include_facilities: Annotated[Union[str, bool], "Include stadium and facility information (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
-    Get basic information for all current college football teams.
+    Get college football teams with flexible filtering and optional enhancements.
+    
+    This consolidated tool replaces GetTeamsSimple and GetTeamsByConference,
+    providing a single interface for all team retrieval needs.
     
     Args:
-        limit: Maximum number of teams to return (default: 50, can be string or int)
+        conference: Filter by conference name (e.g., "ACC", "SEC", "Big 12")
+        division: Filter by division (e.g., "FBS", "FCS")
+        search: Search teams by name or abbreviation
+        limit: Maximum number of teams to return (default: 100)
+        include_records: Include team records and statistics (future enhancement)
+        include_roster: Include current roster information (future enhancement)
+        include_coaching: Include coaching staff details (future enhancement) 
+        include_facilities: Include stadium and facility information (future enhancement)
     
     Returns:
-        JSON string with team information including teamId, school, conference, etc.
+        JSON string with team information
+    
+    Examples:
+        - GetTeams() -> All teams (up to 100)
+        - GetTeams(conference="SEC") -> SEC teams only
+        - GetTeams(search="Alabama") -> Teams matching "Alabama"
+        - GetTeams(conference="ACC", limit=20) -> First 20 ACC teams
     """
-    # Convert string input to integer
-    if limit is None:
-        variables = {}
+    # Process and validate parameters
+    params = preprocess_team_params(
+        conference=conference,
+        division=division,
+        search=search,
+        limit=limit,
+        include_records=include_records,
+        include_roster=include_roster,
+        include_coaching=include_coaching,
+        include_facilities=include_facilities
+    )
+    
+    # Select appropriate query based on filters provided
+    if params.get('search'):
+        # Search query
+        search_pattern = format_search_pattern(params['search'])
+        variables = build_query_variables(searchTerm=search_pattern, limit=params['limit'])
+        query = SEARCH_TEAMS_QUERY
+        await ctx.info(f"Searching teams with pattern: {params['search']}")
+    elif params.get('conference'):
+        # Conference filter
+        variables = build_query_variables(conference=params['conference'], limit=params['limit'])
+        query = GET_TEAMS_BY_CONFERENCE_QUERY
+        await ctx.info(f"Fetching teams from conference: {params['conference']}")
+    elif params.get('division'):
+        # Division filter
+        variables = build_query_variables(division=params['division'], limit=params['limit'])
+        query = GET_TEAMS_BY_DIVISION_QUERY
+        await ctx.info(f"Fetching teams from division: {params['division']}")
     else:
-        limit_int = safe_int_conversion(limit, 'limit')
-        variables = build_query_variables(limit=limit_int)
-    return await execute_graphql(GET_TEAMS_SIMPLE_QUERY, variables, ctx)
-
-@mcp.tool()
-async def GetTeamsByConference(
-    conference: Annotated[str, "Conference name (e.g., 'ACC', 'SEC', 'Big 12')"],
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of teams to return (default: 30, can be string or int)"] = 30,
-    ctx: Context = None
-) -> str:
-    """
-    Get all teams in a specific conference.
+        # All teams
+        variables = build_query_variables(limit=params['limit'])
+        query = GET_TEAMS_ALL_QUERY
+        await ctx.info(f"Fetching all teams (limit: {params['limit']})")
     
-    Args:
-        conference: Conference name (e.g., "ACC", "SEC", "Big 12")
-        limit: Maximum number of teams to return (default: 30, can be string or int)
+    # Execute the GraphQL query
+    result = await execute_graphql(query, variables, ctx)
     
-    Returns:
-        JSON string with team information for the specified conference
-    """
-    # Convert string input to integer
-    limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
-    variables = build_query_variables(conference=conference, limit=limit_int)
-    return await execute_graphql(GET_TEAMS_BY_CONFERENCE_QUERY, variables, ctx)
+    # Future enhancement: Add additional data based on include_* flags
+    # This is where we would enhance the response with records, roster, etc.
+    if any([params['include_records'], params['include_roster'], 
+            params['include_coaching'], params['include_facilities']]):
+        await ctx.info("Enhancement flags detected - future feature")
+        # TODO: Implement enhancements using utils functions
+    
+    return result
 
 @mcp.tool()
 async def GetTeamDetails(
@@ -154,7 +234,7 @@ async def GetTeamDetails(
     ctx: Context = None
 ) -> str:
     """
-    Get information for a specific team.
+    Get detailed information for a specific team.
     
     Args:
         team_id: Team ID number (optional, can be string or int)
@@ -166,17 +246,25 @@ async def GetTeamDetails(
     Note:
         Must provide either team_id or school_name
     """
-    if not team_id and not school_name:
-        return '{"error": "Must provide either team_id or school_name"}'
+    # Validate that at least one parameter is provided
+    team_id_int = safe_int_conversion(team_id, 'team_id') if team_id else None
+    school_name_clean = safe_string_conversion(school_name, 'school_name') if school_name else None
+    
+    validate_team_lookup_params(team_id_int, school_name_clean, None)
     
     # Use different queries based on which parameter is provided
-    if team_id:
-        team_id_int = safe_int_conversion(team_id, 'team_id')
+    if team_id_int:
         variables = build_query_variables(teamId=team_id_int)
-        return await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_ID, variables, ctx)
+        result = await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_ID, variables, ctx)
+        await ctx.info(f"Fetching team details by ID: {team_id_int}")
     else:
-        variables = build_query_variables(school=f"%{school_name}%")
-        return await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_NAME, variables, ctx)
+        # Format school name for partial matching
+        school_pattern = f"%{school_name_clean}%"
+        variables = build_query_variables(school=school_pattern)
+        result = await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_NAME, variables, ctx)
+        await ctx.info(f"Fetching team details by name: {school_name_clean}")
+    
+    return result
 
 @mcp.tool()
 async def SearchTeams(
@@ -194,9 +282,13 @@ async def SearchTeams(
     Returns:
         JSON string with matching teams
     """
-    # Convert string input to integer
+    # Process parameters
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 20
-    # Add wildcards for partial matching
-    search_pattern = f"%{search_term}%"
+    search_pattern = format_search_pattern(search_term)
+    
     variables = build_query_variables(searchTerm=search_pattern, limit=limit_int)
-    return await execute_graphql(SEARCH_TEAMS_QUERY, variables, ctx)
+    result = await execute_graphql(SEARCH_TEAMS_QUERY, variables, ctx)
+    
+    await ctx.info(f"Searching teams with term: '{search_term}' (limit: {limit_int})")
+    
+    return result

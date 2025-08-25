@@ -10,8 +10,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
-from src.graphql_executor import execute_graphql, build_query_variables
-from src.param_processor import safe_int_conversion
+from src.graphql_executor import execute_graphql
+from utils.param_utils import safe_int_conversion, safe_bool_conversion, preprocess_betting_params
+from utils.graphql_utils import build_query_variables
 
 # GraphQL queries for betting lines data
 # Query with both season and week
@@ -321,15 +322,21 @@ async def GetBettingLines(
     Returns:
         JSON string with betting lines data, optionally enhanced with betting analysis
     """
-    # Convert string inputs to appropriate types
-    season_int = safe_int_conversion(season, 'season') if season is not None else None
-    week_int = safe_int_conversion(week, 'week') if week is not None else None
-    team_id_int = safe_int_conversion(team_id, 'team_id') if team_id is not None else None
-    limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 50
+    # Process parameters using consolidated utility
+    params = preprocess_betting_params(
+        season=season,
+        week=week,
+        team_id=team_id,
+        limit=limit,
+        calculate_records=calculate_records
+    )
     
-    # Import here to avoid circular imports
-    from src.param_processor import safe_bool_conversion
-    calculate_records_bool = safe_bool_conversion(calculate_records, 'calculate_records')
+    # Extract processed values
+    season_int = params['season']
+    week_int = params['week']
+    team_id_int = params['team_id']
+    limit_int = params['limit']
+    calculate_records_bool = params['calculate_records']
     
     # Select appropriate query based on which parameters are provided
     if team_id_int is not None:

@@ -10,8 +10,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
-from src.graphql_executor import execute_graphql, build_query_variables
-from src.param_processor import safe_int_conversion, safe_bool_conversion
+from src.graphql_executor import execute_graphql  
+from utils.param_utils import preprocess_ranking_params
+from utils.graphql_utils import build_query_variables
 
 # GraphQL query for rankings data
 GET_RANKINGS_QUERY = """

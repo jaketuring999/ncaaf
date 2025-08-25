@@ -14,7 +14,7 @@ from fastmcp import Context
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
-from src.param_processor import safe_int_conversion, safe_bool_conversion
+from utils.param_utils import safe_int_conversion, safe_bool_conversion
 
 
 class SchemaParser:

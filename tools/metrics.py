@@ -10,8 +10,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
-from src.graphql_executor import execute_graphql, build_query_variables
-from src.param_processor import safe_int_conversion
+from src.graphql_executor import execute_graphql
+from utils.param_utils import safe_int_conversion
+from utils.graphql_utils import build_query_variables
 
 # Placeholder - will implement later
 GET_ADVANCED_METRICS_QUERY = """
