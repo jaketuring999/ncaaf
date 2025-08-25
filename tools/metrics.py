@@ -11,8 +11,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
 from src.graphql_executor import execute_graphql
-from utils.param_utils import safe_int_conversion
+from utils.param_utils import safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
+from utils.response_formatter import safe_format_response
 
 # Placeholder - will implement later
 GET_ADVANCED_METRICS_QUERY = """
@@ -40,6 +41,7 @@ query GetAdvancedMetrics($teamId: Int, $season: smallint) {
 async def GetAdvancedMetrics(
     team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -51,10 +53,18 @@ async def GetAdvancedMetrics(
     
     Returns:
         JSON string with advanced metrics data
+        include_raw_data: Include raw GraphQL response data (default: false)
     """
     # Convert string inputs to integers
     team_id_int = safe_int_conversion(team_id, 'team_id') if team_id is not None else None
     season_int = safe_int_conversion(season, 'season') if season is not None else None
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(teamId=team_id_int, season=season_int)
-    return await execute_graphql(GET_ADVANCED_METRICS_QUERY, variables, ctx)
+    result = await execute_graphql(GET_ADVANCED_METRICS_QUERY, variables, ctx)
+    
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'metrics', include_raw_data_bool)

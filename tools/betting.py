@@ -13,6 +13,7 @@ from mcp_instance import mcp
 from src.graphql_executor import execute_graphql
 from utils.param_utils import safe_int_conversion, safe_bool_conversion, preprocess_betting_params
 from utils.graphql_utils import build_query_variables
+from utils.response_formatter import safe_format_response
 
 # GraphQL queries for betting lines data
 # Query with both season and week
@@ -307,6 +308,7 @@ async def GetBettingLines(
     team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (default: 50, can be string or int)"] = 50,
     calculate_records: Annotated[Union[str, bool], "Calculate ATS, Over/Under, and SU records (default: false)"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -318,11 +320,14 @@ async def GetBettingLines(
         team_id: Team ID (can be string or int)
         limit: Maximum number of games to return (default: 50, can be string or int)
         calculate_records: Calculate ATS, Over/Under, and SU records (default: false)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Returns:
         JSON string with betting lines data, optionally enhanced with betting analysis
     """
     # Process parameters using consolidated utility
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
+    
     params = preprocess_betting_params(
         season=season,
         week=week,
@@ -332,11 +337,11 @@ async def GetBettingLines(
     )
     
     # Extract processed values
-    season_int = params['season']
-    week_int = params['week']
-    team_id_int = params['team_id']
-    limit_int = params['limit']
-    calculate_records_bool = params['calculate_records']
+    season_int = params.get('season')
+    week_int = params.get('week')
+    team_id_int = params.get('team_id')
+    limit_int = params.get('limit')
+    calculate_records_bool = params.get('calculate_records')
     
     # Select appropriate query based on which parameters are provided
     if team_id_int is not None:
@@ -396,4 +401,8 @@ async def GetBettingLines(
             if ctx:
                 await ctx.warning(f"Could not calculate betting analysis: {e}")
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'betting', include_raw_data_bool)

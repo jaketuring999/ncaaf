@@ -13,8 +13,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
 from src.graphql_executor import execute_graphql
-from utils.param_utils import preprocess_team_params, validate_team_lookup_params, safe_int_conversion, safe_string_conversion
+from utils.param_utils import preprocess_team_params, validate_team_lookup_params, safe_int_conversion, safe_string_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables, format_search_pattern
+from utils.response_formatter import safe_format_response
 
 # GraphQL queries for team operations
 GET_TEAMS_QUERY = """
@@ -153,6 +154,7 @@ async def GetTeams(
     include_roster: Annotated[Union[str, bool], "Include current roster information (default: false)"] = False,
     include_coaching: Annotated[Union[str, bool], "Include coaching staff details (default: false)"] = False,
     include_facilities: Annotated[Union[str, bool], "Include stadium and facility information (default: false)"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -170,6 +172,7 @@ async def GetTeams(
         include_roster: Include current roster information (future enhancement)
         include_coaching: Include coaching staff details (future enhancement) 
         include_facilities: Include stadium and facility information (future enhancement)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Returns:
         JSON string with team information
@@ -181,6 +184,8 @@ async def GetTeams(
         - GetTeams(conference="ACC", limit=20) -> First 20 ACC teams
     """
     # Process and validate parameters
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
+    
     params = preprocess_team_params(
         conference=conference,
         division=division,
@@ -225,12 +230,17 @@ async def GetTeams(
         await ctx.info("Enhancement flags detected - future feature")
         # TODO: Implement enhancements using utils functions
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'teams', include_raw_data_bool)
 
 @mcp.tool()
 async def GetTeamDetails(
     team_id: Annotated[Optional[Union[str, int]], "Team ID number (optional, can be string or int)"] = None,
     school_name: Annotated[Optional[str], "School name to search for (optional, supports partial matches)"] = None,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -242,6 +252,7 @@ async def GetTeamDetails(
     
     Returns:
         JSON string with team details (teamId, school, conference, division, etc.)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Note:
         Must provide either team_id or school_name
@@ -249,6 +260,7 @@ async def GetTeamDetails(
     # Validate that at least one parameter is provided
     team_id_int = safe_int_conversion(team_id, 'team_id') if team_id else None
     school_name_clean = safe_string_conversion(school_name, 'school_name') if school_name else None
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     validate_team_lookup_params(team_id_int, school_name_clean, None)
     
@@ -264,12 +276,17 @@ async def GetTeamDetails(
         result = await execute_graphql(GET_TEAM_DETAILS_QUERY_BY_NAME, variables, ctx)
         await ctx.info(f"Fetching team details by name: {school_name_clean}")
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'teams', include_raw_data_bool)
 
 @mcp.tool()
 async def SearchTeams(
     search_term: Annotated[str, "Text to search for in school names or abbreviations"],
     limit: Annotated[Optional[Union[str, int]], "Maximum number of results to return (default: 20, can be string or int)"] = 20,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -281,14 +298,20 @@ async def SearchTeams(
     
     Returns:
         JSON string with matching teams
+        include_raw_data: Include raw GraphQL response data (default: false)
     """
     # Process parameters
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 20
     search_pattern = format_search_pattern(search_term)
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(searchTerm=search_pattern, limit=limit_int)
     result = await execute_graphql(SEARCH_TEAMS_QUERY, variables, ctx)
     
     await ctx.info(f"Searching teams with term: '{search_term}' (limit: {limit_int})")
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'teams', include_raw_data_bool)

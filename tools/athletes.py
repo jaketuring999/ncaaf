@@ -11,8 +11,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
 from src.graphql_executor import execute_graphql
-from utils.param_utils import safe_int_conversion
+from utils.param_utils import safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
+from utils.response_formatter import safe_format_response
 
 # GraphQL query for athlete data
 GET_ATHLETES_QUERY = """
@@ -89,6 +90,7 @@ query GetAthletes($teamId: Int) {
 async def GetAthletes(
     team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -100,10 +102,12 @@ async def GetAthletes(
     
     Returns:
         JSON string with athlete data
+        include_raw_data: Include raw GraphQL response data (default: false)
     """
     # Convert string inputs to integers
     team_id_int = safe_int_conversion(team_id, 'team_id') if team_id is not None else None
     season_int = safe_int_conversion(season, 'season') if season is not None else None
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     # Use different query based on whether season filtering is needed
     if season_int is not None:
@@ -113,4 +117,10 @@ async def GetAthletes(
         query = GET_ATHLETES_QUERY_NO_SEASON
         variables = build_query_variables(teamId=team_id_int)
     
-    return await execute_graphql(query, variables, ctx)
+    result = await execute_graphql(query, variables, ctx)
+    
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'athletes', include_raw_data_bool)

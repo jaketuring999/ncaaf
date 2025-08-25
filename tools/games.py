@@ -11,8 +11,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
 from src.graphql_executor import execute_graphql
-from utils.param_utils import preprocess_game_params
+from utils.param_utils import preprocess_game_params, safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
+from utils.response_formatter import safe_format_response
 
 # GraphQL queries for game data
 # Query for games with both season and week
@@ -526,6 +527,7 @@ async def GetGames(
     include_media: Annotated[Union[str, bool], "Include media/TV information (can be string or bool)"] = False,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     calculate_stats: Annotated[Union[str, bool], "Calculate game statistics and trends (default: false)"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -540,6 +542,7 @@ async def GetGames(
         include_media: Include media/TV information (can be string or bool)
         limit: Maximum number of games to return (can be string or int)
         calculate_stats: Calculate game statistics and trends (default: false)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Returns:
         JSON string with game information, optionally enhanced with statistical analysis
@@ -547,6 +550,7 @@ async def GetGames(
     # Preprocess parameters to handle string inputs
     from src.param_processor import safe_bool_conversion
     calculate_stats_bool = safe_bool_conversion(calculate_stats, 'calculate_stats')
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     processed = preprocess_game_params(
         season=season,
@@ -644,7 +648,11 @@ async def GetGames(
             if ctx:
                 await ctx.warning(f"Could not calculate game statistics: {e}")
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'games', include_raw_data_bool)
 
 @mcp.tool()
 async def GetGamesByWeek(
@@ -652,6 +660,7 @@ async def GetGamesByWeek(
     week: Annotated[Union[str, int], "Week number (1-15 for regular season, can be string or int)"],
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     calculate_weekly_trends: Annotated[Union[str, bool], "Calculate weekly betting and scoring trends (default: false)"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -662,6 +671,7 @@ async def GetGamesByWeek(
         week: Week number (1-15 for regular season, can be string or int)
         limit: Maximum number of games to return (can be string or int)
         calculate_weekly_trends: Calculate weekly betting and scoring trends (default: false)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Returns:
         JSON string with games for the specified week, optionally enhanced with weekly trends
@@ -671,6 +681,7 @@ async def GetGamesByWeek(
     week_int = safe_int_conversion(week, 'week')
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
     calculate_weekly_trends_bool = safe_bool_conversion(calculate_weekly_trends, 'calculate_weekly_trends')
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(season=season_int, week=week_int, limit=limit_int)
     
@@ -706,7 +717,11 @@ async def GetGamesByWeek(
             if ctx:
                 await ctx.warning(f"Could not calculate weekly trends: {e}")
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'games', include_raw_data_bool)
 
 @mcp.tool()
 async def GetTeamGames(
@@ -714,6 +729,7 @@ async def GetTeamGames(
     season: Annotated[Optional[Union[str, int]], "Season year (optional, can be string or int)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     calculate_performance: Annotated[Union[str, bool], "Calculate team performance metrics (default: false)"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -724,6 +740,7 @@ async def GetTeamGames(
         season: Season year (optional, can be string or int)
         limit: Maximum number of games to return (can be string or int)
         calculate_performance: Calculate team performance metrics (default: false)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Returns:
         JSON string with team's games, optionally enhanced with performance analysis
@@ -733,6 +750,7 @@ async def GetTeamGames(
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
     calculate_performance_bool = safe_bool_conversion(calculate_performance, 'calculate_performance')
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     # Select appropriate query based on whether season is provided
     if season_int is not None:
@@ -774,11 +792,16 @@ async def GetTeamGames(
             if ctx:
                 await ctx.warning(f"Could not calculate team performance: {e}")
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'games', include_raw_data_bool)
 
 @mcp.tool()
 async def GetRecentGames(
     limit: Annotated[Optional[Union[str, int]], "Maximum number of recent games to return (default: 20, can be string or int)"] = 20,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -786,12 +809,20 @@ async def GetRecentGames(
     
     Args:
         limit: Maximum number of recent games to return (default: 20, can be string or int)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Returns:
         JSON string with recently completed games
     """
     # Convert string input to integer
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 20
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(limit=limit_int)
-    return await execute_graphql(GET_RECENT_GAMES_QUERY, variables, ctx)
+    result = await execute_graphql(GET_RECENT_GAMES_QUERY, variables, ctx)
+    
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'games', include_raw_data_bool)

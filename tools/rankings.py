@@ -11,8 +11,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
 from src.graphql_executor import execute_graphql  
-from utils.param_utils import preprocess_ranking_params
+from utils.param_utils import preprocess_ranking_params, safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
+from utils.response_formatter import safe_format_response
 
 # GraphQL query for rankings data
 GET_RANKINGS_QUERY = """
@@ -53,6 +54,7 @@ async def GetRankings(
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
     week: Annotated[Optional[Union[str, int]], "Week number (can be string or int)"] = None,
     calculate_movement: Annotated[Union[str, bool], "Calculate ranking movement and trends (default: false)"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -62,6 +64,7 @@ async def GetRankings(
         season: Season year (e.g., 2024 or "2024")
         week: Week number (can be string or int)
         calculate_movement: Calculate ranking movement and trends (default: false)
+        include_raw_data: Include raw GraphQL response data (default: false)
     
     Returns:
         JSON string with rankings data, optionally enhanced with movement analysis
@@ -70,6 +73,7 @@ async def GetRankings(
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     week_int = safe_int_conversion(week, 'week') if week is not None else None
     calculate_movement_bool = safe_bool_conversion(calculate_movement, 'calculate_movement')
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
     variables = build_query_variables(season=season_int, week=week_int)
     
@@ -106,4 +110,8 @@ async def GetRankings(
             if ctx:
                 await ctx.warning(f"Could not calculate ranking analysis: {e}")
     
-    return result
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        return result
+    else:
+        return safe_format_response(result, 'rankings', include_raw_data_bool)
