@@ -20,6 +20,8 @@ query GetAthletes($teamId: Int, $season: smallint) {
         where: {
             athleteTeams: {
                 teamId: { _eq: $teamId }
+                startYear: { _lte: $season }
+                endYear: { _gte: $season }
             }
         }
         limit: 100
@@ -36,6 +38,42 @@ query GetAthletes($teamId: Int, $season: smallint) {
         
         athleteTeams {
             teamId
+            startYear
+            endYear
+            team {
+                school
+                abbreviation
+                conference
+            }
+        }
+    }
+}
+"""
+
+GET_ATHLETES_QUERY_NO_SEASON = """
+query GetAthletes($teamId: Int) {
+    athlete(
+        where: {
+            athleteTeams: {
+                teamId: { _eq: $teamId }
+            }
+        }
+        limit: 100
+    ) {
+        id
+        name
+        firstName
+        lastName
+        weight
+        height
+        jersey
+        positionId
+        teamId
+        
+        athleteTeams {
+            teamId
+            startYear
+            endYear
             team {
                 school
                 abbreviation
@@ -66,5 +104,12 @@ async def GetAthletes(
     team_id_int = safe_int_conversion(team_id, 'team_id') if team_id is not None else None
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     
-    variables = build_query_variables(teamId=team_id_int, season=season_int)
-    return await execute_graphql(GET_ATHLETES_QUERY, variables, ctx)
+    # Use different query based on whether season filtering is needed
+    if season_int is not None:
+        query = GET_ATHLETES_QUERY
+        variables = build_query_variables(teamId=team_id_int, season=season_int)
+    else:
+        query = GET_ATHLETES_QUERY_NO_SEASON
+        variables = build_query_variables(teamId=team_id_int)
+    
+    return await execute_graphql(query, variables, ctx)
