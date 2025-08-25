@@ -385,10 +385,11 @@ async def GetBettingLines(
             betting_analysis = calculate_betting_analysis_from_graphql(result, team_id_int)
             
             if betting_analysis and 'error' not in betting_analysis:
-                # Parse the result to add betting analysis
+                # Parse the result to add betting summary (avoid duplication)
                 import json
                 result_data = json.loads(result)
-                result_data['betting_analysis'] = betting_analysis
+                # Only add the summary, not the full game_details to avoid duplication
+                result_data['betting_summary'] = betting_analysis.get('summary', betting_analysis)
                 result = json.dumps(result_data, indent=2)
             elif betting_analysis and 'error' in betting_analysis:
                 # Add error info but don't fail the whole query
