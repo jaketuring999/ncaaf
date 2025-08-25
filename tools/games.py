@@ -9,9 +9,9 @@ from fastmcp import Context
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from src.mcp_server import mcp
+from mcp_instance import mcp
 from src.graphql_executor import execute_graphql, build_query_variables
-from src.param_processor import preprocess_game_params, safe_int_conversion
+from src.param_processor import safe_int_conversion, safe_bool_conversion, preprocess_game_params
 
 # GraphQL queries for game data
 # Query for games with both season and week
@@ -524,6 +524,7 @@ async def GetGames(
     include_weather: Annotated[Union[str, bool], "Include weather data (can be string or bool)"] = False,
     include_media: Annotated[Union[str, bool], "Include media/TV information (can be string or bool)"] = False,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
+    calculate_stats: Annotated[Union[str, bool], "Calculate game statistics and trends (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -537,11 +538,15 @@ async def GetGames(
         include_weather: Include weather data (can be string or bool)
         include_media: Include media/TV information (can be string or bool)
         limit: Maximum number of games to return (can be string or int)
+        calculate_stats: Calculate game statistics and trends (default: false)
     
     Returns:
-        JSON string with game information
+        JSON string with game information, optionally enhanced with statistical analysis
     """
     # Preprocess parameters to handle string inputs
+    from src.param_processor import safe_bool_conversion
+    calculate_stats_bool = safe_bool_conversion(calculate_stats, 'calculate_stats')
+    
     processed = preprocess_game_params(
         season=season,
         week=week,
@@ -606,13 +611,46 @@ async def GetGames(
             limit=processed.get('limit')
         )
     
-    return await execute_graphql(query, variables, ctx)
+    # Execute the GraphQL query
+    result = await execute_graphql(query, variables, ctx)
+    
+    # Add game statistics if requested
+    if calculate_stats_bool:
+        try:
+            # Import game utilities
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            from utils.game_utils import calculate_game_stats_from_graphql
+            
+            # Calculate game statistics
+            game_stats = calculate_game_stats_from_graphql(result, "comprehensive")
+            
+            if game_stats and 'error' not in game_stats:
+                # Parse the result to add game statistics
+                import json
+                result_data = json.loads(result)
+                result_data['game_statistics'] = game_stats
+                result = json.dumps(result_data, indent=2)
+            elif game_stats and 'error' in game_stats:
+                # Add error info but don't fail the whole query
+                result_data = json.loads(result)
+                result_data['game_statistics_error'] = game_stats['error']
+                result = json.dumps(result_data, indent=2)
+                
+        except Exception as e:
+            # Don't fail the main query if statistics calculation fails
+            if ctx:
+                await ctx.warning(f"Could not calculate game statistics: {e}")
+    
+    return result
 
 @mcp.tool()
 async def GetGamesByWeek(
     season: Annotated[Union[str, int], "Season year (e.g., 2024 or '2024')"],
     week: Annotated[Union[str, int], "Week number (1-15 for regular season, can be string or int)"],
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
+    calculate_weekly_trends: Annotated[Union[str, bool], "Calculate weekly betting and scoring trends (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -622,23 +660,59 @@ async def GetGamesByWeek(
         season: Season year (e.g., 2024 or "2024")
         week: Week number (1-15 for regular season, can be string or int)
         limit: Maximum number of games to return (can be string or int)
+        calculate_weekly_trends: Calculate weekly betting and scoring trends (default: false)
     
     Returns:
-        JSON string with games for the specified week
+        JSON string with games for the specified week, optionally enhanced with weekly trends
     """
-    # Convert string inputs to integers
+    # Convert string inputs to appropriate types
     season_int = safe_int_conversion(season, 'season')
     week_int = safe_int_conversion(week, 'week')
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
+    calculate_weekly_trends_bool = safe_bool_conversion(calculate_weekly_trends, 'calculate_weekly_trends')
     
     variables = build_query_variables(season=season_int, week=week_int, limit=limit_int)
-    return await execute_graphql(GET_GAMES_BY_WEEK_QUERY, variables, ctx)
+    
+    # Execute the GraphQL query
+    result = await execute_graphql(GET_GAMES_BY_WEEK_QUERY, variables, ctx)
+    
+    # Add weekly trends analysis if requested
+    if calculate_weekly_trends_bool:
+        try:
+            # Import game utilities
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            from utils.game_utils import calculate_game_stats_from_graphql
+            
+            # Calculate weekly trends
+            weekly_trends = calculate_game_stats_from_graphql(result, "weekly")
+            
+            if weekly_trends and 'error' not in weekly_trends:
+                # Parse the result to add weekly trends
+                import json
+                result_data = json.loads(result)
+                result_data['weekly_trends'] = weekly_trends
+                result = json.dumps(result_data, indent=2)
+            elif weekly_trends and 'error' in weekly_trends:
+                # Add error info but don't fail the whole query
+                result_data = json.loads(result)
+                result_data['weekly_trends_error'] = weekly_trends['error']
+                result = json.dumps(result_data, indent=2)
+                
+        except Exception as e:
+            # Don't fail the main query if trends calculation fails
+            if ctx:
+                await ctx.warning(f"Could not calculate weekly trends: {e}")
+    
+    return result
 
 @mcp.tool()
 async def GetTeamGames(
     team_id: Annotated[Union[str, int], "Team ID number (can be string or int)"],
     season: Annotated[Optional[Union[str, int]], "Season year (optional, can be string or int)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
+    calculate_performance: Annotated[Union[str, bool], "Calculate team performance metrics (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -648,14 +722,16 @@ async def GetTeamGames(
         team_id: Team ID number (can be string or int)
         season: Season year (optional, can be string or int)
         limit: Maximum number of games to return (can be string or int)
+        calculate_performance: Calculate team performance metrics (default: false)
     
     Returns:
-        JSON string with team's games
+        JSON string with team's games, optionally enhanced with performance analysis
     """
-    # Convert string inputs to integers
+    # Convert string inputs to appropriate types
     team_id_int = safe_int_conversion(team_id, 'team_id')
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
+    calculate_performance_bool = safe_bool_conversion(calculate_performance, 'calculate_performance')
     
     # Select appropriate query based on whether season is provided
     if season_int is not None:
@@ -665,7 +741,39 @@ async def GetTeamGames(
         query = GET_TEAM_GAMES_QUERY
         variables = build_query_variables(teamId=team_id_int, limit=limit_int)
     
-    return await execute_graphql(query, variables, ctx)
+    # Execute the GraphQL query
+    result = await execute_graphql(query, variables, ctx)
+    
+    # Add team performance analysis if requested
+    if calculate_performance_bool:
+        try:
+            # Import team utilities
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            from utils.team_utils import calculate_team_performance_from_graphql
+            
+            # Calculate team performance
+            team_performance = calculate_team_performance_from_graphql(result, team_id_int)
+            
+            if team_performance and 'error' not in team_performance:
+                # Parse the result to add team performance analysis
+                import json
+                result_data = json.loads(result)
+                result_data['team_performance'] = team_performance
+                result = json.dumps(result_data, indent=2)
+            elif team_performance and 'error' in team_performance:
+                # Add error info but don't fail the whole query
+                result_data = json.loads(result)
+                result_data['team_performance_error'] = team_performance['error']
+                result = json.dumps(result_data, indent=2)
+                
+        except Exception as e:
+            # Don't fail the main query if performance analysis fails
+            if ctx:
+                await ctx.warning(f"Could not calculate team performance: {e}")
+    
+    return result
 
 @mcp.tool()
 async def GetRecentGames(

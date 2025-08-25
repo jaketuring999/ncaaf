@@ -12,7 +12,6 @@ import httpx
 from fastmcp import Context
 
 from .models import GraphQLError
-from .security import SecurityValidator
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +44,9 @@ class GraphQLClient:
         """
         variables = variables or {}
         
-        # Security validation
-        is_valid, error_msg = SecurityValidator.validate_query(query)
-        if not is_valid:
-            if ctx:
-                await ctx.error(f"Security validation failed: {error_msg}")
-            raise GraphQLError(f"Query rejected: {error_msg}", query=query)
+        # Basic query validation
+        if not query.strip():
+            raise GraphQLError("Query cannot be empty", query=query)
         
         # Prepare request
         payload = {

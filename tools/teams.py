@@ -9,7 +9,7 @@ from fastmcp import Context
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from src.mcp_server import mcp
+from mcp_instance import mcp
 from src.graphql_executor import execute_graphql, build_query_variables
 from src.param_processor import safe_int_conversion
 

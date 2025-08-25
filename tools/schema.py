@@ -13,7 +13,7 @@ from fastmcp import Context
 # Import from dedicated mcp module
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from src.mcp_server import mcp
+from mcp_instance import mcp
 from src.param_processor import safe_int_conversion, safe_bool_conversion
 
 
