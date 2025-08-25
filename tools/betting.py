@@ -2,7 +2,7 @@
 Betting-related MCP tools for college football data.
 """
 
-from typing import Optional, Union
+from typing import Optional, Union, Annotated
 from fastmcp import Context
 
 # Import from server module at package level
@@ -301,10 +301,11 @@ query GetBettingLines($limit: Int) {
 
 @mcp.tool() 
 async def GetBettingLines(
-    season: Optional[Union[str, int]] = None,
-    week: Optional[Union[str, int]] = None,
-    team_id: Optional[Union[str, int]] = None,
-    limit: Optional[Union[str, int]] = 50,
+    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
+    week: Annotated[Optional[Union[str, int]], "Week number (can be string or int)"] = None,
+    team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (default: 50, can be string or int)"] = 50,
+    calculate_records: Annotated[Union[str, bool], "Calculate ATS, Over/Under, and SU records (default: false)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -315,15 +316,20 @@ async def GetBettingLines(
         week: Week number (can be string or int)
         team_id: Team ID (can be string or int)
         limit: Maximum number of games to return (default: 50, can be string or int)
+        calculate_records: Calculate ATS, Over/Under, and SU records (default: false)
     
     Returns:
-        JSON string with betting lines data
+        JSON string with betting lines data, optionally enhanced with betting analysis
     """
-    # Convert string inputs to integers
+    # Convert string inputs to appropriate types
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     week_int = safe_int_conversion(week, 'week') if week is not None else None
     team_id_int = safe_int_conversion(team_id, 'team_id') if team_id is not None else None
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 50
+    
+    # Import here to avoid circular imports
+    from src.param_processor import safe_bool_conversion
+    calculate_records_bool = safe_bool_conversion(calculate_records, 'calculate_records')
     
     # Select appropriate query based on which parameters are provided
     if team_id_int is not None:
@@ -351,4 +357,36 @@ async def GetBettingLines(
         query = GET_ALL_BETTING_LINES_QUERY
         variables = build_query_variables(limit=limit_int)
     
-    return await execute_graphql(query, variables, ctx)
+    # Execute the GraphQL query
+    result = await execute_graphql(query, variables, ctx)
+    
+    # Add betting analysis if requested and we have a team_id
+    if calculate_records_bool and team_id_int:
+        try:
+            # Import betting utilities
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            from betting_utils import calculate_betting_analysis_from_graphql
+            
+            # Calculate betting analysis
+            betting_analysis = calculate_betting_analysis_from_graphql(result, team_id_int)
+            
+            if betting_analysis and 'error' not in betting_analysis:
+                # Parse the result to add betting analysis
+                import json
+                result_data = json.loads(result)
+                result_data['betting_analysis'] = betting_analysis
+                result = json.dumps(result_data, indent=2)
+            elif betting_analysis and 'error' in betting_analysis:
+                # Add error info but don't fail the whole query
+                result_data = json.loads(result)
+                result_data['betting_analysis_error'] = betting_analysis['error']
+                result = json.dumps(result_data, indent=2)
+                
+        except Exception as e:
+            # Don't fail the main query if betting analysis fails
+            if ctx:
+                await ctx.warning(f"Could not calculate betting analysis: {e}")
+    
+    return result

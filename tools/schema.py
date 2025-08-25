@@ -6,7 +6,7 @@ Provides intelligent search and exploration of the schema without large introspe
 import os
 import re
 import json
-from typing import Optional, Dict, List, Any, Tuple
+from typing import Optional, Dict, List, Any, Tuple, Union, Annotated
 from pathlib import Path
 from fastmcp import Context
 
@@ -14,6 +14,7 @@ from fastmcp import Context
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from src.mcp_server import mcp
+from src.param_processor import safe_int_conversion, safe_bool_conversion
 
 
 class SchemaParser:
@@ -311,14 +312,14 @@ def get_schema_parser() -> SchemaParser:
 
 @mcp.tool()
 async def SchemaExplorer(
-    operation: str,
-    query: Optional[str] = None,
-    kind: Optional[str] = None,
-    limit: Optional[int] = 25,
-    offset: Optional[int] = 0,
-    include_fields: bool = False,
-    exclude_aggregates: bool = True,
-    use_regex: bool = False,
+    operation: Annotated[str, "Operation to perform - 'search', 'types', 'fields', 'details', 'stats'"],
+    query: Annotated[Optional[str], "Search query or type name (for search/details operations)"] = None,
+    kind: Annotated[Optional[str], "Filter by type kind - OBJECT, SCALAR, ENUM, INPUT_OBJECT (for types operation)"] = None,
+    limit: Annotated[Optional[Union[str, int]], "Maximum results to return (default: 25)"] = 25,
+    offset: Annotated[Optional[Union[str, int]], "Pagination offset (default: 0)"] = 0,
+    include_fields: Annotated[Union[str, bool], "Include field details in results"] = False,
+    exclude_aggregates: Annotated[Union[str, bool], "Exclude aggregate helper types (default: True)"] = True,
+    use_regex: Annotated[Union[str, bool], "Use regex for search operation (default: False)"] = False,
     ctx: Context = None
 ) -> str:
     """
@@ -345,6 +346,13 @@ async def SchemaExplorer(
         - List query fields: operation="fields"
     """
     try:
+        # Convert string parameters to appropriate types
+        limit = safe_int_conversion(limit, 'limit') if limit is not None else 25
+        offset = safe_int_conversion(offset, 'offset') if offset is not None else 0
+        include_fields = safe_bool_conversion(include_fields, 'include_fields')
+        exclude_aggregates = safe_bool_conversion(exclude_aggregates, 'exclude_aggregates')
+        use_regex = safe_bool_conversion(use_regex, 'use_regex')
+        
         parser = get_schema_parser()
         
         if operation == "search":
@@ -492,4 +500,43 @@ async def SchemaExplorer(
     except Exception as e:
         if ctx:
             await ctx.error(f"SchemaExplorer error: {e}")
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+async def execute_query(
+    query: Annotated[str, "GraphQL query string"],
+    variables: Annotated[Optional[dict], "Optional variables dictionary"] = None,
+    ctx: Context = None
+) -> str:
+    """
+    Execute a GraphQL query against the college football database.
+    Power-user tool for advanced queries not covered by specialized tools.
+    
+    Args:
+        query: GraphQL query string
+        variables: Optional variables dictionary
+    
+    Returns:
+        JSON string containing the query results
+    """
+    from src.graphql_executor import execute_graphql
+    
+    try:
+        if ctx:
+            await ctx.info("Executing custom GraphQL query")
+        
+        if not query:
+            return json.dumps({"error": "Query is required"})
+        
+        # Execute the query
+        if variables is None:
+            variables = {}
+        result = await execute_graphql(query, variables, ctx)
+        
+        return result
+        
+    except Exception as e:
+        if ctx:
+            await ctx.error(f"Query execution error: {e}")
         return json.dumps({"error": str(e)})
