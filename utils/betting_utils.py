@@ -389,6 +389,72 @@ def analyze_head_to_head(
     }
 
 
+def filter_games_by_scenario(games: List[Dict[str, Any]], team_name: str, scenario: str) -> List[Dict[str, Any]]:
+    """
+    Filter games based on betting scenario (home/away + spread position).
+    
+    Args:
+        games: List of game dictionaries from GraphQL query
+        team_name: Name of team to analyze
+        scenario: Scenario type - 'road_underdog', 'home_favorite', 'road_favorite', 'home_underdog'
+        
+    Returns:
+        Filtered list of games matching the scenario
+    """
+    if not scenario:
+        return games
+    
+    valid_scenarios = ['road_underdog', 'home_favorite', 'road_favorite', 'home_underdog']
+    if scenario not in valid_scenarios:
+        return games
+    
+    filtered_games = []
+    
+    for game in games:
+        # Skip games without complete data
+        if not all([
+            game.get('homePoints') is not None,
+            game.get('awayPoints') is not None,
+            game.get('lines') and len(game['lines']) > 0,
+            game['lines'][0].get('spread') is not None
+        ]):
+            continue
+            
+        # Determine if team is home or away
+        home_team = game.get('homeTeam', '')
+        team_lower = team_name.lower()
+        is_home_team = team_lower in home_team.lower() or home_team.lower() in team_lower
+        
+        # Get spread for this team
+        line = game['lines'][0]
+        spread = safe_numeric_conversion(line['spread'])
+        if spread is None:
+            continue
+            
+        # Calculate team's effective spread (positive = underdog, negative = favorite)
+        if is_home_team:
+            team_spread = spread
+        else:
+            team_spread = -spread
+        
+        # Check if game matches the scenario
+        scenario_match = False
+        
+        if scenario == "road_underdog" and not is_home_team and team_spread > 0:
+            scenario_match = True
+        elif scenario == "home_favorite" and is_home_team and team_spread < 0:
+            scenario_match = True
+        elif scenario == "road_favorite" and not is_home_team and team_spread < 0:
+            scenario_match = True
+        elif scenario == "home_underdog" and is_home_team and team_spread > 0:
+            scenario_match = True
+        
+        if scenario_match:
+            filtered_games.append(game)
+    
+    return filtered_games
+
+
 def analyze_betting_trends(games: List[Dict[str, Any]], team_name: str, last_n_games: int = 10) -> Dict[str, Any]:
     """
     Analyze recent betting trends for a team.
@@ -399,7 +465,7 @@ def analyze_betting_trends(games: List[Dict[str, Any]], team_name: str, last_n_g
         last_n_games: Number of recent games to analyze
         
     Returns:
-        Dictionary with recent betting trends
+        Dictionary with recent betting trends including scenario breakdowns
     """
     if not games:
         return {"error": "No games provided for trend analysis"}
@@ -434,6 +500,37 @@ def analyze_betting_trends(games: List[Dict[str, Any]], team_name: str, last_n_g
     home_record = calculate_team_betting_record(home_games, team_name) if home_games else None
     away_record = calculate_team_betting_record(away_games, team_name) if away_games else None
     
+    # Calculate scenario breakdowns
+    scenario_performance = {}
+    scenarios = ['road_underdog', 'home_favorite', 'road_favorite', 'home_underdog']
+    
+    for scenario in scenarios:
+        scenario_games = filter_games_by_scenario(recent_games, team_name, scenario)
+        if scenario_games:
+            scenario_record = calculate_team_betting_record(scenario_games, team_name)
+            
+            # Calculate average spread for this scenario
+            spreads = []
+            for game in scenario_games:
+                if game.get('lines') and len(game['lines']) > 0:
+                    home_team = game.get('homeTeam', '')
+                    is_home_team = team_lower in home_team.lower() or home_team.lower() in team_lower
+                    spread = safe_numeric_conversion(game['lines'][0].get('spread'))
+                    if spread is not None:
+                        team_spread = spread if is_home_team else -spread
+                        spreads.append(team_spread)
+            
+            avg_spread = sum(spreads) / len(spreads) if spreads else 0
+            
+            scenario_performance[scenario] = {
+                "games": len(scenario_games),
+                "ats_record": scenario_record["ats"],
+                "ats_percentage": scenario_record["ats_percentage"],
+                "su_record": scenario_record["su"],
+                "su_percentage": scenario_record["su_percentage"],
+                "avg_spread": round(avg_spread, 1)
+            }
+    
     return {
         "analysis_period": f"Last {len(recent_games)} games",
         "overall_trends": {
@@ -449,7 +546,8 @@ def analyze_betting_trends(games: List[Dict[str, Any]], team_name: str, last_n_g
             "away_games": len(away_games),
             "away_ats_record": away_record["ats"] if away_record else "N/A", 
             "away_ats_percentage": away_record["ats_percentage"] if away_record else 0
-        }
+        },
+        "scenario_performance": scenario_performance
     }
 
 

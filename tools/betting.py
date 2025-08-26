@@ -416,6 +416,7 @@ async def GetBettingAnalysis(
     opponent: Annotated[Optional[str], "Opponent team name, abbreviation, or ID for head-to-head analysis"] = None,
     analysis_type: Annotated[str, "Analysis type: 'spread_ranges', 'over_under', 'h2h', 'trends', or 'all' (default)"] = "all",
     season: Annotated[Optional[Union[str, int]], "Season year (default: current season)"] = None,
+    scenario: Annotated[Optional[str], "Betting scenario: 'road_underdog', 'home_favorite', 'road_favorite', 'home_underdog'"] = None,
     last_n_games: Annotated[Optional[Union[str, int]], "Number of recent games for trend analysis (default: 10)"] = 10,
     include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
@@ -428,12 +429,23 @@ async def GetBettingAnalysis(
     - h2h: Head-to-head betting record with specific opponent 
     - trends: Recent betting trends and home/away splits
     - all: Complete analysis package with multiple insights
+
+    Scenario filtering allows targeting specific betting situations:
+    - road_underdog: Away games where team is underdog (spread > 0)
+    - home_favorite: Home games where team is favorite (spread < 0)  
+    - road_favorite: Away games where team is favorite (spread < 0)
+    - home_underdog: Home games where team is underdog (spread > 0)
+    
+    Example queries:
+    - "How does Alabama perform as a road underdog?" → scenario="road_underdog"
+    - "Georgia's record as home favorite?" → scenario="home_favorite"
     
     Args:
         team: Team name, abbreviation, or ID to analyze
         opponent: Opponent team name, abbreviation, or ID for head-to-head analysis
         analysis_type: Type of analysis to perform
         season: Season year (default: current season)
+        scenario: Filter by betting scenario (home/away + spread position)
         last_n_games: Number of recent games for trend analysis
         include_raw_data: Include raw GraphQL response data
         
@@ -539,23 +551,27 @@ async def GetBettingAnalysis(
             except:
                 pass  # If we can't get opponent name, skip H2H analysis
         
+        # Apply scenario filter if provided
+        from utils.betting_utils import filter_games_by_scenario
+        filtered_games = filter_games_by_scenario(games, team_name, scenario) if scenario else games
+        
         # Perform requested analysis
         analysis_results = {}
         
         if analysis_type in ['spread_ranges', 'all']:
-            spread_analysis = analyze_spread_ranges(games, team_name)
+            spread_analysis = analyze_spread_ranges(filtered_games, team_name)
             analysis_results['spread_ranges'] = spread_analysis
         
         if analysis_type in ['h2h', 'all'] and opponent_name:
-            h2h_analysis = analyze_head_to_head(games, team_name, opponent_name)
+            h2h_analysis = analyze_head_to_head(filtered_games, team_name, opponent_name)
             analysis_results['h2h'] = h2h_analysis
         
         if analysis_type in ['over_under', 'all']:
-            ou_analysis = analyze_over_under_ranges(games, team_name)
+            ou_analysis = analyze_over_under_ranges(filtered_games, team_name)
             analysis_results['over_under'] = ou_analysis
         
         if analysis_type in ['trends', 'all']:
-            trend_analysis = analyze_betting_trends(games, team_name, last_n_games_int)
+            trend_analysis = analyze_betting_trends(filtered_games, team_name, last_n_games_int)
             analysis_results['trends'] = trend_analysis
         
         # Format response based on analysis type
@@ -564,8 +580,9 @@ async def GetBettingAnalysis(
             summary = {
                 "team": team_name,
                 "analysis_type": "Complete Betting Analysis",
-                "total_games_analyzed": len(games),
-                "season": season_int if season_int else "All seasons"
+                "total_games_analyzed": len(filtered_games),
+                "season": season_int if season_int else "All seasons",
+                "scenario": scenario if scenario else "All games"
             }
             
             formatted_entries = []
