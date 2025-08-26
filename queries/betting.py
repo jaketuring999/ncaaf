@@ -10,7 +10,11 @@ query GetBettingLines($season: smallint!, $week: smallint!, $limit: Int) {
             week: { _eq: $week }
             lines: {}
         }
-        orderBy: { startDate: DESC }
+        orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
+            { startDate: DESC }
+        ]
         limit: $limit
     ) {
         id
@@ -22,6 +26,19 @@ query GetBettingLines($season: smallint!, $week: smallint!, $limit: Int) {
         awayTeam
         homePoints
         awayPoints
+        excitement
+        conferenceGame
+        neutralSite
+        
+        # ELO Ratings
+        awayStartElo
+        homeStartElo
+        awayEndElo
+        homeEndElo
+        
+        # Win Probabilities
+        awayPostgameWinProb
+        homePostgameWinProb
         
         homeTeamInfo {
             teamId
@@ -54,7 +71,11 @@ query GetBettingLines($season: smallint!, $limit: Int) {
             season: { _eq: $season }
             lines: {}
         }
-        orderBy: { startDate: DESC }
+        orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
+            { startDate: DESC }
+        ]
         limit: $limit
     ) {
         id
@@ -66,6 +87,19 @@ query GetBettingLines($season: smallint!, $limit: Int) {
         awayTeam
         homePoints
         awayPoints
+        excitement
+        conferenceGame
+        neutralSite
+        
+        # ELO Ratings
+        awayStartElo
+        homeStartElo
+        awayEndElo
+        homeEndElo
+        
+        # Win Probabilities
+        awayPostgameWinProb
+        homePostgameWinProb
         
         homeTeamInfo {
             teamId
@@ -98,7 +132,11 @@ query GetBettingLines($week: smallint!, $limit: Int) {
             week: { _eq: $week }
             lines: {}
         }
-        orderBy: { startDate: DESC }
+        orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
+            { startDate: DESC }
+        ]
         limit: $limit
     ) {
         id
@@ -110,6 +148,19 @@ query GetBettingLines($week: smallint!, $limit: Int) {
         awayTeam
         homePoints
         awayPoints
+        excitement
+        conferenceGame
+        neutralSite
+        
+        # ELO Ratings
+        awayStartElo
+        homeStartElo
+        awayEndElo
+        homeEndElo
+        
+        # Win Probabilities
+        awayPostgameWinProb
+        homePostgameWinProb
         
         homeTeamInfo {
             teamId
@@ -150,7 +201,11 @@ query GetBettingLines($teamId: Int!, $season: smallint, $limit: Int) {
                 { lines: {} }
             ]
         }
-        orderBy: { startDate: DESC }
+        orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
+            { startDate: DESC }
+        ]
         limit: $limit
     ) {
         id
@@ -162,6 +217,19 @@ query GetBettingLines($teamId: Int!, $season: smallint, $limit: Int) {
         awayTeam
         homePoints
         awayPoints
+        excitement
+        conferenceGame
+        neutralSite
+        
+        # ELO Ratings
+        awayStartElo
+        homeStartElo
+        awayEndElo
+        homeEndElo
+        
+        # Win Probabilities
+        awayPostgameWinProb
+        homePostgameWinProb
         
         homeTeamInfo {
             teamId
@@ -201,7 +269,11 @@ query GetBettingLines($teamId: Int!, $limit: Int) {
                 { lines: {} }
             ]
         }
-        orderBy: { startDate: DESC }
+        orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
+            { startDate: DESC }
+        ]
         limit: $limit
     ) {
         id
@@ -213,6 +285,19 @@ query GetBettingLines($teamId: Int!, $limit: Int) {
         awayTeam
         homePoints
         awayPoints
+        excitement
+        conferenceGame
+        neutralSite
+        
+        # ELO Ratings
+        awayStartElo
+        homeStartElo
+        awayEndElo
+        homeEndElo
+        
+        # Win Probabilities
+        awayPostgameWinProb
+        homePostgameWinProb
         
         homeTeamInfo {
             teamId
@@ -244,7 +329,11 @@ query GetBettingLines($limit: Int) {
         where: {
             lines: {}
         }
-        orderBy: { startDate: DESC }
+        orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
+            { startDate: DESC }
+        ]
         limit: $limit
     ) {
         id
@@ -256,6 +345,19 @@ query GetBettingLines($limit: Int) {
         awayTeam
         homePoints
         awayPoints
+        excitement
+        conferenceGame
+        neutralSite
+        
+        # ELO Ratings
+        awayStartElo
+        homeStartElo
+        awayEndElo
+        homeEndElo
+        
+        # Win Probabilities
+        awayPostgameWinProb
+        homePostgameWinProb
         
         homeTeamInfo {
             teamId

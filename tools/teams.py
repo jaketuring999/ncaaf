@@ -22,7 +22,10 @@ from queries.teams import (
     GET_TEAMS_BY_DIVISION_QUERY,
     SEARCH_TEAMS_QUERY,
     GET_TEAM_DETAILS_QUERY_BY_ID,
-    GET_TEAM_DETAILS_QUERY_BY_NAME
+    GET_TEAM_DETAILS_QUERY_BY_NAME,
+    GET_TEAM_RATINGS_QUERY,
+    GET_TEAM_TALENT_QUERY,
+    GET_TEAM_WITH_RATINGS_QUERY
 )
 
 @mcp.tool()
@@ -193,3 +196,79 @@ async def SearchTeams(
         return result
     else:
         return safe_format_response(result, 'teams', include_raw_data_bool)
+
+
+@mcp.tool()
+async def GetTeamRatings(
+    team: Annotated[str, "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"],
+    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024)"] = 2024,
+    include_talent: Annotated[Union[str, bool], "Include team talent composite rating"] = True,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
+) -> str:
+    """
+    Get comprehensive team strength ratings including ELO, FPI, SP+, SRS, and talent ratings.
+    
+    This tool provides all available team strength and efficiency ratings that are used
+    for predictive analytics and team comparison.
+    
+    Args:
+        team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
+        season: Season year (default: 2024)
+        include_talent: Include team talent composite rating
+        include_raw_data: Include raw GraphQL response data
+        
+    Returns:
+        YAML formatted team ratings with predictive analytics context
+    """
+    from utils.team_resolver import resolve_team_id
+    
+    # Process parameters
+    season_int = safe_int_conversion(season, 'season') if season is not None else 2024
+    include_talent_bool = safe_bool_conversion(include_talent, 'include_talent')
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
+    
+    # Resolve team to ID
+    try:
+        team_id = await resolve_team_id(team)
+    except ValueError as e:
+        return safe_format_response(
+            {"error": f"Could not find team: {team} - {str(e)}"},
+            'team_ratings',
+            include_raw_data_bool
+        )
+    
+    # Get team ratings
+    variables = build_query_variables(teamId=team_id, season=season_int)
+    ratings_result = await execute_graphql(GET_TEAM_RATINGS_QUERY, variables)
+    
+    # Parse JSON result
+    import json
+    try:
+        ratings_data = json.loads(ratings_result) if isinstance(ratings_result, str) else ratings_result
+    except (json.JSONDecodeError, TypeError):
+        ratings_data = {"data": {"ratings": []}}
+    
+    combined_result = {
+        "team_id": team_id,
+        "season": season_int,
+        "ratings": ratings_data.get("data", {}).get("ratings", [])
+    }
+    
+    # Get team talent if requested
+    if include_talent_bool:
+        talent_result = await execute_graphql(GET_TEAM_TALENT_QUERY, variables)
+        try:
+            talent_data = json.loads(talent_result) if isinstance(talent_result, str) else talent_result
+        except (json.JSONDecodeError, TypeError):
+            talent_data = {"data": {"teamTalent": []}}
+        combined_result["talent"] = talent_data.get("data", {}).get("teamTalent", [])
+    
+    # Format response based on include_raw_data flag
+    if include_raw_data_bool:
+        import json
+        return json.dumps(combined_result, indent=2)
+    else:
+        # Convert to JSON string for formatter
+        import json
+        json_result = json.dumps({"data": {"team_ratings": combined_result}})
+        return safe_format_response(json_result, 'team_ratings', include_raw_data_bool)

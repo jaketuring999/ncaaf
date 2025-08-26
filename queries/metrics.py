@@ -12,12 +12,39 @@ query GetAdvancedMetrics($teamId: Int, $season: smallint) {
     ) {
         teamId
         year
+        
+        # Overall EPA and Success
         epa
         epaAllowed
-        explosiveness
         success
+        successAllowed
+        
+        # Offensive Metrics
+        rushingEpa
+        passingEpa
+        explosiveness
+        lineYards
+        secondLevelYards
+        openFieldYards
+        highlightYards
+        standardDownsSuccess
+        passingDownsSuccess
+        
+        # Defensive Metrics (Allowed)
+        rushingEpaAllowed
+        passingEpaAllowed
+        explosivenessAllowed
+        lineYardsAllowed
+        secondLevelYardsAllowed
+        openFieldYardsAllowed
+        highlightYardsAllowed
+        standardDownsSuccessAllowed
+        passingDownsSuccessAllowed
+        
         team {
             school
+            abbreviation
+            conference
         }
     }
 }

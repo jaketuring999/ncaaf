@@ -127,3 +127,104 @@ query GetTeamDetailsByName($school: String!) {
     }
 }
 """
+
+GET_TEAM_RATINGS_QUERY = """
+query GetTeamRatings($teamId: Int, $season: smallint) {
+    ratings(
+        where: {
+            _and: [
+                { teamId: { _eq: $teamId } }
+                { year: { _eq: $season } }
+            ]
+        }
+    ) {
+        teamId
+        year
+        team
+        conference
+        
+        # ELO Rating
+        elo
+        
+        # FPI Ratings
+        fpi
+        fpiOffensiveEfficiency
+        fpiDefensiveEfficiency
+        fpiSpecialTeamsEfficiency
+        fpiOverallEfficiency
+        fpiSosRank
+        fpiRemainingSosRank
+        fpiGameControlRank
+        fpiResumeRank
+        fpiStrengthOfRecordRank
+        fpiAvgWinProbabilityRank
+        
+        # SP+ Ratings
+        spOverall
+        spOffense
+        spDefense
+        spSpecialTeams
+        
+        # SRS Rating
+        srs
+    }
+}
+"""
+
+GET_TEAM_TALENT_QUERY = """
+query GetTeamTalent($teamId: Int, $season: smallint) {
+    teamTalent(
+        where: {
+            _and: [
+                { team: { teamId: { _eq: $teamId } } }
+                { year: { _eq: $season } }
+            ]
+        }
+    ) {
+        year
+        talent
+        team {
+            teamId
+            school
+            conference
+        }
+    }
+}
+"""
+
+GET_TEAM_WITH_RATINGS_QUERY = """
+query GetTeamWithRatings($teamId: Int!, $season: smallint!) {
+    currentTeams(
+        where: { teamId: { _eq: $teamId } }
+    ) {
+        teamId
+        school
+        conference
+        conferenceId
+        division
+        classification
+        abbreviation
+        
+        # Team Ratings
+        ratings(where: { year: { _eq: $season } }) {
+            year
+            elo
+            fpi
+            fpiOffensiveEfficiency
+            fpiDefensiveEfficiency
+            fpiSpecialTeamsEfficiency
+            spOverall
+            spOffense
+            spDefense
+            spSpecialTeams
+            srs
+        }
+        
+        # Team Talent
+        talent(where: { year: { _eq: $season } }) {
+            year
+            talent
+        }
+    }
+}
+"""

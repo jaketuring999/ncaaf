@@ -163,7 +163,7 @@ def format_games_response(raw_data: str, include_raw_data: bool = False) -> str:
             "date_range": date_range
         }
         
-        # Create formatted entries
+        # Create formatted entries with intelligent analysis
         formatted_entries = []
         for game in games:
             home_team = game.get("homeTeamInfo") or {}
@@ -178,6 +178,60 @@ def format_games_response(raw_data: str, include_raw_data: bool = False) -> str:
                 "matchup": f"{away_team.get('school', 'TBD')} @ {home_team.get('school', 'TBD')}",
                 "score": f"{game.get('awayPoints', 0)} - {game.get('homePoints', 0)}" if game.get("status") == "completed" else "TBD"
             }
+            
+            # Add predictive analytics if available
+            predictive_data = {}
+            
+            # ELO Analysis
+            home_elo = game.get("homeStartElo")
+            away_elo = game.get("awayStartElo") 
+            if home_elo and away_elo:
+                elo_diff = home_elo - away_elo
+                predictive_data["elo_analysis"] = {
+                    "home_elo": home_elo,
+                    "away_elo": away_elo,
+                    "elo_advantage": f"{home_team.get('school', 'Home')} +{elo_diff}" if elo_diff > 0 else f"{away_team.get('school', 'Away')} +{abs(elo_diff)}",
+                    "elo_implied_spread": round(elo_diff * 0.03 + 3, 1),  # ELO to spread conversion + HFA
+                    "strength_assessment": "Elite Matchup" if min(home_elo, away_elo) > 1900 else "Strong Teams" if min(home_elo, away_elo) > 1700 else "Average Teams"
+                }
+            
+            # Win Probability Analysis
+            home_win_prob = game.get("homePostgameWinProb")
+            away_win_prob = game.get("awayPostgameWinProb")
+            if home_win_prob is not None and away_win_prob is not None:
+                predictive_data["win_probabilities"] = {
+                    "home_win_prob": f"{home_win_prob:.1%}",
+                    "away_win_prob": f"{away_win_prob:.1%}",
+                    "model_favorite": home_team.get('school', 'Home') if home_win_prob > away_win_prob else away_team.get('school', 'Away'),
+                    "confidence_level": "High" if max(home_win_prob, away_win_prob) > 0.7 else "Medium" if max(home_win_prob, away_win_prob) > 0.6 else "Low"
+                }
+            
+            # Game Context
+            excitement = game.get("excitement")
+            if excitement is not None:
+                predictive_data["game_context"] = {
+                    "excitement_index": round(excitement, 2),
+                    "excitement_level": "Extremely High" if excitement > 8 else "High" if excitement > 6 else "Medium" if excitement > 4 else "Low",
+                    "conference_game": game.get("conferenceGame", False),
+                    "neutral_site": game.get("neutralSite", False)
+                }
+            
+            # Line Scores for completed games
+            if game.get("status") == "completed":
+                home_line_scores = game.get("homeLineScores")
+                away_line_scores = game.get("awayLineScores")
+                if home_line_scores and away_line_scores:
+                    predictive_data["scoring_flow"] = {
+                        "home_by_quarter": home_line_scores,
+                        "away_by_quarter": away_line_scores,
+                        "total_quarters": len(home_line_scores),
+                        "overtime": len(home_line_scores) > 4
+                    }
+            
+            # Add predictive analysis to entry if any data available
+            if predictive_data:
+                entry["predictive_analysis"] = predictive_data
+            
             formatted_entries.append(entry)
         
         return create_formatted_response(raw_data, summary, formatted_entries, include_raw_data)
@@ -277,7 +331,7 @@ def format_betting_response(raw_data: str, include_raw_data: bool = False) -> st
             "average_total": round(avg_total, 1)
         }
         
-        # Create formatted entries
+        # Create formatted entries with intelligent betting analysis
         formatted_entries = []
         for game in games:
             home_team = game.get("homeTeamInfo") or {}
@@ -301,6 +355,75 @@ def format_betting_response(raw_data: str, include_raw_data: bool = False) -> st
                 "betting_lines": line_info,
                 "status": game.get("status")
             }
+            
+            # Add intelligent betting analysis if predictive data is available
+            betting_intelligence = {}
+            
+            # ELO Betting Edge Analysis
+            home_elo = game.get("homeStartElo")
+            away_elo = game.get("awayStartElo") 
+            if home_elo and away_elo and lines:
+                line = lines[0]
+                spread = line.get("spread")
+                if spread is not None:
+                    elo_diff = home_elo - away_elo
+                    elo_implied_spread = elo_diff * 0.03 + 3  # Convert ELO to spread + HFA
+                    spread_difference = elo_implied_spread - (-spread)  # Negative because spread is negative when home favored
+                    
+                    betting_intelligence["elo_edge_analysis"] = {
+                        "elo_implied_spread": round(elo_implied_spread, 1),
+                        "actual_spread": spread,
+                        "edge_magnitude": round(abs(spread_difference), 1),
+                        "value_side": home_team.get('school', 'Home') if spread_difference > 0 else away_team.get('school', 'Away'),
+                        "edge_assessment": "Strong Value" if abs(spread_difference) >= 3 else "Moderate Value" if abs(spread_difference) >= 1.5 else "No Significant Edge"
+                    }
+            
+            # Win Probability vs Moneyline Analysis
+            home_win_prob = game.get("homePostgameWinProb")
+            away_win_prob = game.get("awayPostgameWinProb")
+            if home_win_prob is not None and away_win_prob is not None and lines:
+                line = lines[0] 
+                home_ml = line.get("moneylineHome")
+                away_ml = line.get("moneylineAway")
+                
+                if home_ml and away_ml:
+                    # Convert American odds to implied probability
+                    def american_odds_to_prob(odds):
+                        if odds > 0:
+                            return 100 / (odds + 100)
+                        else:
+                            return abs(odds) / (abs(odds) + 100)
+                    
+                    home_implied_prob = american_odds_to_prob(home_ml)
+                    away_implied_prob = american_odds_to_prob(away_ml)
+                    
+                    home_edge = home_win_prob - home_implied_prob
+                    away_edge = away_win_prob - away_implied_prob
+                    
+                    best_edge = max(home_edge, away_edge)
+                    if best_edge >= 0.05:  # 5% edge threshold
+                        betting_intelligence["moneyline_value"] = {
+                            "best_value_team": home_team.get('school', 'Home') if home_edge > away_edge else away_team.get('school', 'Away'),
+                            "expected_value": f"+{best_edge:.1%}",
+                            "model_prob": f"{home_win_prob:.1%}" if home_edge > away_edge else f"{away_win_prob:.1%}",
+                            "market_prob": f"{home_implied_prob:.1%}" if home_edge > away_edge else f"{away_implied_prob:.1%}",
+                            "value_assessment": "Excellent Value" if best_edge >= 0.10 else "Good Value"
+                        }
+            
+            # Game Context for Betting
+            excitement = game.get("excitement")
+            if excitement is not None:
+                betting_intelligence["game_context"] = {
+                    "excitement_level": "Extremely High" if excitement > 8 else "High" if excitement > 6 else "Medium" if excitement > 4 else "Low",
+                    "betting_popularity": "Public will be heavily on this game" if excitement > 7 else "Moderate public interest" if excitement > 5 else "Lower public interest",
+                    "conference_rivalry": game.get("conferenceGame", False),
+                    "neutral_site": game.get("neutralSite", False)
+                }
+            
+            # Add betting intelligence if any analysis available
+            if betting_intelligence:
+                entry["betting_intelligence"] = betting_intelligence
+            
             formatted_entries.append(entry)
         
         return create_formatted_response(raw_data, summary, formatted_entries, include_raw_data)
@@ -497,6 +620,114 @@ def format_metrics_response(raw_data: str, include_raw_data: bool = False) -> st
         }, indent=2)
 
 
+def format_team_ratings_response(raw_data: str, include_raw_data: bool = False) -> str:
+    """
+    Format team ratings response into human-readable YAML summary with intelligent analysis.
+    
+    Args:
+        raw_data: Raw JSON response from team ratings query
+        include_raw_data: Whether to include raw data
+        
+    Returns:
+        Formatted YAML response with intelligent ratings analysis
+    """
+    try:
+        data = json.loads(raw_data)
+        team_data = data.get("data", {}).get("team_ratings", {})
+        
+        ratings = team_data.get("ratings", [])
+        talent = team_data.get("talent", [])
+        team_id = team_data.get("team_id")
+        season = team_data.get("season")
+        
+        if not ratings:
+            summary = {
+                "team_id": team_id,
+                "season": season,
+                "description": "No ratings data found for this team/season",
+                "available_data": "None"
+            }
+            return create_formatted_response(raw_data, summary, [], include_raw_data)
+        
+        rating = ratings[0]  # Get first (primary) rating
+        talent_data = talent[0] if talent else {}
+        
+        # Create intelligent summary
+        summary = {
+            "team": rating.get("team"),
+            "conference": rating.get("conference"),
+            "season": season,
+            "overall_strength": "Elite" if rating.get("elo", 0) > 1900 else "Strong" if rating.get("elo", 0) > 1700 else "Average" if rating.get("elo", 0) > 1500 else "Below Average",
+            "key_metrics": {
+                "elo_rating": rating.get("elo"),
+                "fpi_overall": rating.get("fpi"),
+                "sp_plus_overall": rating.get("spOverall"),
+                "srs_rating": rating.get("srs"),
+                "talent_composite": talent_data.get("talent") if talent_data else None
+            }
+        }
+        
+        # Create formatted entries with intelligent analysis
+        formatted_entries = []
+        
+        # Overall Strength Analysis
+        formatted_entries.append({
+            "category": "Overall Team Strength",
+            "elo_rating": rating.get("elo"),
+            "elo_interpretation": "Elite (Top 10)" if rating.get("elo", 0) > 1900 else "Strong (Top 25)" if rating.get("elo", 0) > 1700 else "Average" if rating.get("elo", 0) > 1500 else "Below Average",
+            "fpi_overall": rating.get("fpi"),
+            "sp_plus_overall": rating.get("spOverall"),
+            "srs_rating": rating.get("srs")
+        })
+        
+        # Efficiency Breakdown
+        formatted_entries.append({
+            "category": "Efficiency Ratings (FPI)",
+            "offensive_efficiency": rating.get("fpiOffensiveEfficiency"),
+            "defensive_efficiency": rating.get("fpiDefensiveEfficiency"),
+            "special_teams_efficiency": rating.get("fpiSpecialTeamsEfficiency"),
+            "overall_efficiency": rating.get("fpiOverallEfficiency"),
+            "efficiency_balance": "Offensive" if (rating.get("fpiOffensiveEfficiency", 50) - rating.get("fpiDefensiveEfficiency", 50)) > 10 else "Defensive" if (rating.get("fpiDefensiveEfficiency", 50) - rating.get("fpiOffensiveEfficiency", 50)) > 10 else "Balanced"
+        })
+        
+        # SP+ Breakdown
+        formatted_entries.append({
+            "category": "SP+ Unit Ratings",
+            "sp_offense": rating.get("spOffense"),
+            "sp_defense": rating.get("spDefense"), 
+            "sp_special_teams": rating.get("spSpecialTeams"),
+            "sp_overall": rating.get("spOverall"),
+            "dominant_unit": "Offense" if (rating.get("spOffense", 0) - abs(rating.get("spDefense", 0))) > 5 else "Defense" if (abs(rating.get("spDefense", 0)) - rating.get("spOffense", 0)) > 5 else "Balanced"
+        })
+        
+        # Schedule and Context
+        formatted_entries.append({
+            "category": "Schedule & Context",
+            "strength_of_schedule_rank": rating.get("fpiSosRank"),
+            "resume_rank": rating.get("fpiResumeRank"),
+            "strength_of_record_rank": rating.get("fpiStrengthOfRecordRank"),
+            "game_control_rank": rating.get("fpiGameControlRank"),
+            "schedule_difficulty": "Extremely Hard" if rating.get("fpiSosRank", 100) <= 10 else "Hard" if rating.get("fpiSosRank", 100) <= 30 else "Average" if rating.get("fpiSosRank", 100) <= 70 else "Easy"
+        })
+        
+        # Talent Analysis
+        if talent_data:
+            formatted_entries.append({
+                "category": "Talent Composite",
+                "talent_rating": talent_data.get("talent"),
+                "talent_level": "Elite" if talent_data.get("talent", 0) > 900 else "High" if talent_data.get("talent", 0) > 800 else "Above Average" if talent_data.get("talent", 0) > 700 else "Average",
+                "recruiting_strength": "Top 10 class equivalent" if talent_data.get("talent", 0) > 950 else "Top 25 class equivalent" if talent_data.get("talent", 0) > 850 else "Solid recruiting" if talent_data.get("talent", 0) > 750 else "Average recruiting"
+            })
+        
+        return create_formatted_response(raw_data, summary, formatted_entries, include_raw_data)
+        
+    except Exception as e:
+        return json.dumps({
+            "error": f"Failed to format team ratings response: {str(e)}",
+            "raw_data": json.loads(raw_data) if raw_data else None
+        }, indent=2)
+
+
 def format_generic_graphql_response(raw_data: str, include_raw_data: bool = False) -> str:
     """
     Format generic GraphQL response into human-readable summary.
@@ -606,6 +837,7 @@ def safe_format_response(
         'rankings': format_rankings_response,
         'athletes': format_athletes_response,
         'metrics': format_metrics_response,
+        'team_ratings': format_team_ratings_response,
         'generic': format_generic_graphql_response
     }
     

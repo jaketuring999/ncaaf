@@ -852,3 +852,331 @@ def calculate_betting_analysis_from_graphql(graphql_result: str, team_id: int = 
         
     except Exception as e:
         return {"error": f"Error calculating betting analysis: {str(e)}"}
+
+
+def analyze_elo_betting_edge(
+    home_elo: int, 
+    away_elo: int, 
+    spread: float, 
+    home_team: str, 
+    away_team: str
+) -> Dict[str, Any]:
+    """
+    Analyze betting edge using ELO ratings vs betting spreads.
+    
+    ELO ratings predict point spreads. Compare actual spread to ELO-implied spread
+    to find value bets.
+    
+    Args:
+        home_elo: Home team ELO rating
+        away_elo: Away team ELO rating  
+        spread: Actual betting spread (negative = home favored)
+        home_team: Home team name
+        away_team: Away team name
+        
+    Returns:
+        Dictionary with betting edge analysis
+    """
+    if not all([home_elo, away_elo, spread is not None]):
+        return {"error": "Missing ELO or spread data"}
+        
+    # ELO difference predicts margin (roughly 1 ELO point = 0.03 points on spread)
+    elo_diff = home_elo - away_elo
+    elo_implied_spread = elo_diff * 0.03  # ELO differential to point spread conversion
+    
+    # Add home field advantage (typically ~3 points)
+    elo_implied_spread += 3
+    
+    # Calculate betting edge
+    spread_difference = elo_implied_spread - (-spread)  # Negative because spread is negative when home favored
+    
+    # Interpretation
+    edge_analysis = {
+        "home_elo": home_elo,
+        "away_elo": away_elo,
+        "elo_advantage": f"{home_team} +{elo_diff}" if elo_diff > 0 else f"{away_team} +{abs(elo_diff)}",
+        "elo_implied_spread": round(elo_implied_spread, 1),
+        "actual_spread": spread,
+        "edge_magnitude": round(abs(spread_difference), 1),
+        "betting_recommendation": {}
+    }
+    
+    if abs(spread_difference) >= 3:  # Significant edge threshold
+        if spread_difference > 0:
+            # ELO thinks home team is better than spread suggests
+            edge_analysis["betting_recommendation"] = {
+                "side": home_team,
+                "confidence": "High" if abs(spread_difference) >= 5 else "Medium",
+                "reasoning": f"ELO model suggests {home_team} should be favored by {elo_implied_spread:.1f}, but spread is only {spread}. {abs(spread_difference):.1f} point value on {home_team}."
+            }
+        else:
+            # ELO thinks away team is better than spread suggests  
+            edge_analysis["betting_recommendation"] = {
+                "side": away_team,
+                "confidence": "High" if abs(spread_difference) >= 5 else "Medium", 
+                "reasoning": f"ELO model suggests {home_team} should be favored by only {elo_implied_spread:.1f}, but spread is {spread}. {abs(spread_difference):.1f} point value on {away_team}."
+            }
+    else:
+        edge_analysis["betting_recommendation"] = {
+            "side": "No strong lean",
+            "confidence": "Low",
+            "reasoning": f"ELO model aligns closely with betting spread. Edge of only {abs(spread_difference):.1f} points."
+        }
+    
+    return edge_analysis
+
+
+def analyze_win_probability_edge(
+    home_win_prob: float,
+    away_win_prob: float, 
+    home_moneyline: int,
+    away_moneyline: int,
+    home_team: str,
+    away_team: str
+) -> Dict[str, Any]:
+    """
+    Analyze moneyline betting edge using win probabilities.
+    
+    Compare model win probabilities to implied probabilities from moneylines
+    to find value bets.
+    
+    Args:
+        home_win_prob: Model's home team win probability (0-1)
+        away_win_prob: Model's away team win probability (0-1)
+        home_moneyline: Home team moneyline (American odds)
+        away_moneyline: Away team moneyline (American odds)
+        home_team: Home team name
+        away_team: Away team name
+        
+    Returns:
+        Dictionary with moneyline edge analysis
+    """
+    if not all([home_win_prob, away_win_prob, home_moneyline, away_moneyline]):
+        return {"error": "Missing win probability or moneyline data"}
+        
+    def american_odds_to_probability(odds):
+        """Convert American odds to implied probability"""
+        if odds > 0:
+            return 100 / (odds + 100)
+        else:
+            return abs(odds) / (abs(odds) + 100)
+    
+    # Convert moneylines to implied probabilities
+    home_implied_prob = american_odds_to_probability(home_moneyline)
+    away_implied_prob = american_odds_to_probability(away_moneyline)
+    
+    # Calculate edges
+    home_edge = home_win_prob - home_implied_prob
+    away_edge = away_win_prob - away_implied_prob
+    
+    edge_analysis = {
+        "model_probabilities": {
+            "home_win_prob": f"{home_win_prob:.1%}",
+            "away_win_prob": f"{away_win_prob:.1%}"
+        },
+        "market_probabilities": {
+            "home_implied_prob": f"{home_implied_prob:.1%}",
+            "away_implied_prob": f"{away_implied_prob:.1%}"
+        },
+        "edge_analysis": {
+            "home_edge": f"{home_edge:+.1%}",
+            "away_edge": f"{away_edge:+.1%}"
+        },
+        "betting_recommendation": {}
+    }
+    
+    # Determine best bet (minimum 5% edge for recommendation)
+    min_edge_threshold = 0.05
+    
+    if home_edge >= min_edge_threshold and home_edge > away_edge:
+        confidence = "High" if home_edge >= 0.10 else "Medium"
+        edge_analysis["betting_recommendation"] = {
+            "side": f"{home_team} moneyline",
+            "confidence": confidence,
+            "expected_value": f"+{home_edge:.1%}",
+            "reasoning": f"Model gives {home_team} {home_win_prob:.1%} chance to win, but moneyline implies only {home_implied_prob:.1%}. {home_edge:+.1%} edge."
+        }
+    elif away_edge >= min_edge_threshold and away_edge > home_edge:
+        confidence = "High" if away_edge >= 0.10 else "Medium"
+        edge_analysis["betting_recommendation"] = {
+            "side": f"{away_team} moneyline", 
+            "confidence": confidence,
+            "expected_value": f"+{away_edge:.1%}",
+            "reasoning": f"Model gives {away_team} {away_win_prob:.1%} chance to win, but moneyline implies only {away_implied_prob:.1%}. {away_edge:+.1%} edge."
+        }
+    else:
+        edge_analysis["betting_recommendation"] = {
+            "side": "No strong lean",
+            "confidence": "Low",
+            "expected_value": f"Max edge: {max(home_edge, away_edge):+.1%}",
+            "reasoning": "Neither side shows sufficient edge. Model probabilities align closely with market."
+        }
+        
+    return edge_analysis
+
+
+def interpret_advanced_metrics_for_betting(
+    team_metrics: Dict[str, Any],
+    opponent_metrics: Dict[str, Any], 
+    game_context: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Interpret advanced team metrics for betting insights.
+    
+    Analyze offensive/defensive efficiency metrics to predict game flow,
+    pace, and total scoring for betting purposes.
+    
+    Args:
+        team_metrics: Team's advanced metrics (EPA, success rates, etc.)
+        opponent_metrics: Opponent's advanced metrics
+        game_context: Game context (weather, venue, etc.)
+        
+    Returns:
+        Dictionary with betting insights from metrics
+    """
+    insights = {
+        "offensive_matchup": {},
+        "defensive_matchup": {},
+        "pace_and_total_analysis": {},
+        "betting_implications": {}
+    }
+    
+    # Offensive vs Defensive EPA analysis
+    team_off_epa = team_metrics.get('epa', 0)
+    team_def_epa_allowed = team_metrics.get('epaAllowed', 0)
+    opp_off_epa = opponent_metrics.get('epa', 0)
+    opp_def_epa_allowed = opponent_metrics.get('epaAllowed', 0)
+    
+    # Team offense vs opponent defense
+    off_vs_def_advantage = team_off_epa - opp_def_epa_allowed
+    def_vs_off_advantage = team_def_epa_allowed - opp_off_epa
+    
+    insights["offensive_matchup"] = {
+        "team_offense_epa": team_off_epa,
+        "opponent_defense_epa_allowed": opp_def_epa_allowed,
+        "matchup_advantage": round(off_vs_def_advantage, 3),
+        "advantage_assessment": "Favorable" if off_vs_def_advantage > 0.05 else "Unfavorable" if off_vs_def_advantage < -0.05 else "Even"
+    }
+    
+    insights["defensive_matchup"] = {
+        "team_defense_epa_allowed": team_def_epa_allowed,
+        "opponent_offense_epa": opp_off_epa,
+        "matchup_advantage": round(def_vs_off_advantage, 3),
+        "advantage_assessment": "Favorable" if def_vs_off_advantage < -0.05 else "Unfavorable" if def_vs_off_advantage > 0.05 else "Even"
+    }
+    
+    # Pace and explosiveness for total analysis
+    team_explosiveness = team_metrics.get('explosiveness', 0)
+    opp_explosiveness = opponent_metrics.get('explosiveness', 0)
+    combined_explosiveness = team_explosiveness + opp_explosiveness
+    
+    insights["pace_and_total_analysis"] = {
+        "combined_explosiveness": round(combined_explosiveness, 3),
+        "pace_projection": "High" if combined_explosiveness > 0.6 else "Low" if combined_explosiveness < 0.3 else "Average",
+        "total_tendency": "Over lean" if combined_explosiveness > 0.5 else "Under lean" if combined_explosiveness < 0.35 else "No strong lean"
+    }
+    
+    # Betting implications
+    total_epa_advantage = off_vs_def_advantage + def_vs_off_advantage
+    
+    if abs(total_epa_advantage) > 0.1:
+        insights["betting_implications"] = {
+            "spread_lean": "Significant advantage detected",
+            "confidence": "Medium to High",
+            "key_factors": [
+                f"{'Offensive' if off_vs_def_advantage > abs(def_vs_off_advantage) else 'Defensive'} matchup heavily favors {'team' if total_epa_advantage > 0 else 'opponent'}",
+                f"Combined EPA advantage: {total_epa_advantage:+.3f}"
+            ]
+        }
+    else:
+        insights["betting_implications"] = {
+            "spread_lean": "Even matchup",
+            "confidence": "Low",
+            "key_factors": ["Advanced metrics suggest balanced game", "Look to other factors for edge"]
+        }
+        
+    return insights
+
+
+def create_comprehensive_betting_intelligence(game_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Create comprehensive betting intelligence by combining ELO, win probabilities, 
+    and advanced metrics analysis.
+    
+    Args:
+        game_data: Enhanced game data with ELO, win probabilities, metrics
+        
+    Returns:
+        Dictionary with comprehensive betting intelligence
+    """
+    intelligence = {
+        "game_overview": {
+            "matchup": f"{game_data.get('awayTeam', 'Away')} @ {game_data.get('homeTeam', 'Home')}",
+            "excitement_index": game_data.get('excitement'),
+            "conference_game": game_data.get('conferenceGame', False)
+        },
+        "predictive_analysis": {},
+        "betting_edges": {},
+        "recommendation_summary": {}
+    }
+    
+    # ELO Analysis
+    if all([game_data.get('homeStartElo'), game_data.get('awayStartElo'), game_data.get('lines', [{}])[0].get('spread')]):
+        elo_analysis = analyze_elo_betting_edge(
+            game_data['homeStartElo'],
+            game_data['awayStartElo'],
+            game_data['lines'][0]['spread'],
+            game_data.get('homeTeam', 'Home'),
+            game_data.get('awayTeam', 'Away')
+        )
+        intelligence["predictive_analysis"]["elo_analysis"] = elo_analysis
+    
+    # Win Probability Analysis  
+    if all([game_data.get('homePostgameWinProb'), game_data.get('awayPostgameWinProb')]):
+        lines = game_data.get('lines', [{}])[0] if game_data.get('lines') else {}
+        if lines.get('moneylineHome') and lines.get('moneylineAway'):
+            prob_analysis = analyze_win_probability_edge(
+                game_data['homePostgameWinProb'],
+                game_data['awayPostgameWinProb'],
+                lines['moneylineHome'],
+                lines['moneylineAway'],
+                game_data.get('homeTeam', 'Home'),
+                game_data.get('awayTeam', 'Away')
+            )
+            intelligence["predictive_analysis"]["probability_analysis"] = prob_analysis
+    
+    # Combine recommendations
+    recommendations = []
+    confidence_scores = []
+    
+    # Extract recommendations from analyses
+    for analysis_type, analysis_data in intelligence["predictive_analysis"].items():
+        if isinstance(analysis_data, dict) and "betting_recommendation" in analysis_data:
+            rec = analysis_data["betting_recommendation"]
+            if rec.get("confidence") in ["High", "Medium"]:
+                recommendations.append({
+                    "source": analysis_type,
+                    "recommendation": rec["side"],
+                    "confidence": rec["confidence"],
+                    "reasoning": rec.get("reasoning", "")
+                })
+                confidence_scores.append(2 if rec["confidence"] == "High" else 1)
+    
+    # Overall recommendation
+    if recommendations:
+        avg_confidence = sum(confidence_scores) / len(confidence_scores)
+        intelligence["recommendation_summary"] = {
+            "total_analyses": len(recommendations),
+            "overall_confidence": "High" if avg_confidence >= 1.5 else "Medium",
+            "recommendations": recommendations,
+            "consensus": "Multiple models agree" if len(set([r["recommendation"] for r in recommendations])) == 1 else "Mixed signals"
+        }
+    else:
+        intelligence["recommendation_summary"] = {
+            "total_analyses": 0,
+            "overall_confidence": "Low",
+            "recommendations": [],
+            "consensus": "No strong betting edge detected"
+        }
+    
+    return intelligence
