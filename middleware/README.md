@@ -1,77 +1,50 @@
 # NCAAF MCP API Middleware
 
-FastAPI middleware that provides streaming responses from the NCAAF MCP server using OpenAI Agents SDK.
+FastAPI middleware for NCAAF analytics with streaming responses.
 
-## Overview
+## Quick Deploy
 
-This middleware acts as a bridge between clients and the NCAAF MCP server, providing:
-- Streaming responses via Server-Sent Events (SSE)
-- OpenAI Agents SDK integration for conversational AI
-- Authentication and request management
-- Usage logging and analytics
-- Health monitoring
-
-## Architecture
-
-```
-Client → Middleware (FastAPI) → NCAAF MCP Server (FastMCP)
-```
-
-The middleware receives natural language queries, processes them through an OpenAI Agent with access to NCAAF MCP tools, and streams the results back to the client in real-time.
-
-## Configuration
-
-### Environment Variables
-
-All configuration uses the `NCAAF_API_` prefix:
-
+### Prerequisites
 ```bash
-# Server Configuration
-NCAAF_API_HOST=0.0.0.0
-NCAAF_API_PORT=8346
-NCAAF_API_DEBUG=false
-
-# MCP Server
-NCAAF_API_MCP_SERVER_URL=http://localhost:8345
-
-# Authentication
-NCAAF_API_REQUIRE_AUTH=true
-NCAAF_API_AUTH_USERNAME=your_username
-NCAAF_API_AUTH_PASSWORD=your_password
-
-# OpenAI
-NCAAF_API_OPENAI_MODEL=gpt-5-mini
-
-# Database (Optional - for usage logging)
-POSTGRES_URL_USAGE=postgresql://user:pass@host:port/db
+export OPENAI_API_KEY="your-key"
+export POSTGRES_URL_USAGE="postgresql://user:pass@host:port/db"  # Optional
 ```
 
-## Installation & Usage
-
-### Local Development
-
-1. Install dependencies:
+### Install & Run
 ```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Start MCP server (terminal 1)
+fastmcp run server.py --transport http --port 8345
+
+# Start middleware (terminal 2)
+NCAAF_API_REQUIRE_AUTH=false python -m uvicorn app.main:app --host 127.0.0.1 --port 8346
 ```
 
-2. Start the NCAAF MCP server (port 8345):
-```bash
-cd /path/to/ncaaf
-git ls-files | entr -r fastmcp run server.py --transport http --port 8345
-```
-
-3. Start the middleware:
-```bash
-cd middleware
-python app/main.py
-```
-
-### Docker
-
-1. Build and run with Docker Compose:
+### Docker Deploy
 ```bash
 docker-compose up --build
+```
+
+### Test Query
+```bash
+curl -X POST "http://127.0.0.1:8346/api/query/stream" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Get Georgia football team info", "username": "test"}'
+```
+
+## Environment Variables
+
+```bash
+# Required
+OPENAI_API_KEY=sk-...
+
+# Optional
+NCAAF_API_REQUIRE_AUTH=false          # Disable auth for testing
+NCAAF_API_PORT=8346                   # Server port
+NCAAF_API_MCP_SERVER_URL=http://localhost:8345/mcp
+POSTGRES_URL_USAGE=postgresql://...   # Usage logging database
 ```
 
 ## API Endpoints
