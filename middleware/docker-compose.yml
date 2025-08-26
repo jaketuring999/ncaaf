@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  ncaaf-middleware:
+    build: .
+    ports:
+      - "8346:8346"
+    environment:
+      - NCAAF_API_DEBUG=false
+      - NCAAF_API_HOST=0.0.0.0
+      - NCAAF_API_PORT=8346
+      - NCAAF_API_MCP_SERVER_URL=http://host.docker.internal:8345
+      - NCAAF_API_REQUIRE_AUTH=true
+      - NCAAF_API_AUTH_USERNAME=${NCAAF_API_AUTH_USERNAME:-}
+      - NCAAF_API_AUTH_PASSWORD=${NCAAF_API_AUTH_PASSWORD:-}
+      - NCAAF_API_OPENAI_MODEL=gpt-5-mini
+      - NCAAF_API_LOGGING_ENABLED=true
+      - POSTGRES_URL_USAGE=${POSTGRES_URL_USAGE:-}
+    depends_on:
+      - ncaaf-mcp-server
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8346/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  ncaaf-mcp-server:
+    image: ncaaf-mcp-server:latest  # Assumes you have built the NCAAF MCP server image
+    ports:
+      - "8345:8345"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8345/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  default:
+    name: ncaaf-network
