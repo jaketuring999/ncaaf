@@ -10,10 +10,14 @@ import logging
 from typing import Optional, Any, Dict, cast
 from contextlib import asynccontextmanager
 import asyncio
+from dotenv import load_dotenv
 
 import psycopg
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 

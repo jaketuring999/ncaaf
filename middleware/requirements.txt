@@ -4,6 +4,7 @@ openai-agents==0.0.18
 pydantic==2.10.2
 pydantic-settings==2.6.1
 python-multipart==0.0.12
+python-dotenv>=1.1.0
 httpx==0.28.1
 uvloop==0.21.0
 httptools==0.6.4

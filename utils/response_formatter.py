@@ -435,67 +435,178 @@ def format_betting_response(raw_data: str, include_raw_data: bool = False) -> st
         }, indent=2)
 
 
-def format_rankings_response(raw_data: str, include_raw_data: bool = False) -> str:
+def format_rankings_response(raw_data: str, include_raw_data: bool = False, context: dict = None) -> str:
     """
     Format rankings response into human-readable summary.
     
     Args:
         raw_data: Raw JSON response from rankings query
         include_raw_data: Whether to include raw data
+        context: Additional context for formatting (poll_type, team, movement, top_n)
         
     Returns:
-        Formatted JSON response
+        Formatted YAML response optimized for single poll or team search
     """
     try:
         data = json.loads(raw_data)
         polls = data.get("data", {}).get("poll", [])
+        previous_week_data = data.get("previous_week_data", {})
         
-        # Create summary
-        total_polls = len(polls)
-        all_rankings = []
-        poll_types = set()
+        # Extract context parameters
+        context = context or {}
+        poll_type = context.get('poll_type')
+        team = context.get('team')
+        movement = context.get('movement', False)
+        top_n = context.get('top_n', 25)
         
-        for poll in polls:
-            poll_types.add(poll.get("pollType", {}).get("name", "Unknown"))
-            rankings = poll.get("rankings", [])
-            all_rankings.extend(rankings)
+        # Prepare movement data if available
+        prev_rankings = {}
+        if movement and previous_week_data:
+            prev_polls = previous_week_data.get("poll", [])
+            for prev_poll in prev_polls:
+                for prev_ranking in prev_poll.get("rankings", []):
+                    school = prev_ranking.get("team", {}).get("school")
+                    if school:
+                        prev_rankings[school] = prev_ranking.get("rank")
         
-        summary = {
-            "total_results": len(all_rankings),
-            "description": f"Found {len(all_rankings)} team rankings across {total_polls} polls",
-            "poll_types": list(poll_types),
-            "season": polls[0].get("season") if polls else None,
-            "week": polls[0].get("week") if polls else None
-        }
+        # Handle team-specific search across all polls
+        if team:
+            team_rankings = []
+            for poll in polls:
+                poll_name = poll.get("pollType", {}).get("name", "Unknown Poll")
+                rankings = poll.get("rankings", [])
+                
+                for ranking in rankings:
+                    team_obj = ranking.get("team", {})
+                    team_info = {
+                        "poll": poll_name,
+                        "rank": ranking.get("rank"),
+                        "school": team_obj.get("school"),
+                        "conference": team_obj.get("conference"),
+                        "points": ranking.get("points"),
+                        "first_place_votes": ranking.get("firstPlaceVotes", 0)
+                    }
+                    
+                    # Add movement indicator
+                    if movement:
+                        prev_rank = prev_rankings.get(team_obj.get("school"))
+                        if prev_rank:
+                            rank_change = prev_rank - ranking.get("rank")
+                            if rank_change > 0:
+                                team_info["movement"] = f"↑{rank_change}"
+                            elif rank_change < 0:
+                                team_info["movement"] = f"↓{abs(rank_change)}"
+                            else:
+                                team_info["movement"] = "→"
+                    
+                    team_rankings.append(team_info)
+            
+            summary = {
+                "search_term": team,
+                "season": polls[0].get("season") if polls else None,
+                "week": polls[0].get("week") if polls else None,
+                "found_in_polls": len(team_rankings)
+            }
+            
+            return create_formatted_response(raw_data, summary, {"team_rankings": team_rankings}, include_raw_data)
         
-        # Create formatted entries - show top 25 teams
-        formatted_entries = []
-        for poll in polls:
+        # Handle single poll display with full Top 25
+        elif len(polls) == 1:
+            poll = polls[0]
             poll_name = poll.get("pollType", {}).get("name", "Unknown Poll")
             rankings = poll.get("rankings", [])
             
-            poll_entry = {
+            formatted_teams = []
+            for i, ranking in enumerate(rankings[:top_n], 1):
+                team_obj = ranking.get("team", {})
+                rank = ranking.get("rank", i)
+                school = team_obj.get("school", "Unknown")
+                conference = team_obj.get("conference", "")
+                points = ranking.get("points")
+                fpv = ranking.get("firstPlaceVotes", 0)
+                
+                # Format team entry
+                team_str = f"{rank}. {school}"
+                if conference:
+                    team_str += f" ({conference})"
+                
+                # Add first place votes for top teams
+                if fpv > 0:
+                    team_str += f" ({fpv})"
+                
+                # Add points if available
+                if points and points > 0:
+                    team_str += f" - {points} pts"
+                
+                # Add movement indicator
+                if movement:
+                    prev_rank = prev_rankings.get(school)
+                    if prev_rank:
+                        rank_change = prev_rank - rank
+                        if rank_change > 0:
+                            team_str += f" (↑{rank_change})"
+                        elif rank_change < 0:
+                            team_str += f" (↓{abs(rank_change)})"
+                        else:
+                            team_str += " (→)"
+                
+                formatted_teams.append(team_str)
+            
+            summary = {
                 "poll_name": poll_name,
                 "season": poll.get("season"),
                 "week": poll.get("week"),
-                "top_teams": []
+                "teams_shown": len(formatted_teams)
             }
             
-            # Show top 10 teams
-            for ranking in rankings[:10]:
-                team = ranking.get("team", {})
-                team_info = {
-                    "rank": ranking.get("rank"),
-                    "school": team.get("school"),
-                    "conference": team.get("conference"),
-                    "points": ranking.get("points"),
-                    "first_place_votes": ranking.get("firstPlaceVotes", 0)
-                }
-                poll_entry["top_teams"].append(team_info)
-            
-            formatted_entries.append(poll_entry)
+            return create_formatted_response(raw_data, summary, {"rankings": formatted_teams}, include_raw_data)
         
-        return create_formatted_response(raw_data, summary, formatted_entries, include_raw_data)
+        # Handle multiple polls (fallback to original format)
+        else:
+            total_polls = len(polls)
+            all_rankings = []
+            poll_types = set()
+            
+            for poll in polls:
+                poll_types.add(poll.get("pollType", {}).get("name", "Unknown"))
+                rankings = poll.get("rankings", [])
+                all_rankings.extend(rankings)
+            
+            summary = {
+                "total_results": len(all_rankings),
+                "description": f"Found {len(all_rankings)} team rankings across {total_polls} polls",
+                "poll_types": list(poll_types),
+                "season": polls[0].get("season") if polls else None,
+                "week": polls[0].get("week") if polls else None
+            }
+            
+            formatted_entries = []
+            for poll in polls:
+                poll_name = poll.get("pollType", {}).get("name", "Unknown Poll")
+                rankings = poll.get("rankings", [])
+                
+                poll_entry = {
+                    "poll_name": poll_name,
+                    "season": poll.get("season"),
+                    "week": poll.get("week"),
+                    "top_teams": []
+                }
+                
+                # Show limited teams for multiple polls
+                for ranking in rankings[:10]:
+                    team = ranking.get("team", {})
+                    team_info = {
+                        "rank": ranking.get("rank"),
+                        "school": team.get("school"),
+                        "conference": team.get("conference"),
+                        "points": ranking.get("points"),
+                        "first_place_votes": ranking.get("firstPlaceVotes", 0)
+                    }
+                    poll_entry["top_teams"].append(team_info)
+                
+                formatted_entries.append(poll_entry)
+            
+            return create_formatted_response(raw_data, summary, formatted_entries, include_raw_data)
         
     except Exception as e:
         return json.dumps({
@@ -569,6 +680,164 @@ def format_athletes_response(raw_data: str, include_raw_data: bool = False) -> s
     except Exception as e:
         return json.dumps({
             "error": f"Failed to format athletes response: {str(e)}",
+            "raw_data": raw_data if include_raw_data else None
+        }, indent=2)
+
+
+def format_depth_chart_response(raw_data: str, include_raw_data: bool = False, context: dict = None) -> str:
+    """
+    Format depth chart response into organized team depth chart.
+    
+    Args:
+        raw_data: Raw JSON response from depth chart query
+        include_raw_data: Whether to include raw data
+        
+    Returns:
+        Formatted YAML response with organized depth chart
+    """
+    try:
+        data = json.loads(raw_data)
+        athletes = data.get("data", {}).get("athlete", [])
+        
+        if not athletes:
+            return create_formatted_response(raw_data, {"description": "No players found"}, [], include_raw_data)
+        
+        # Get team info from first player
+        team_info = athletes[0].get("athleteTeams", [{}])[0].get("team", {})
+        team_name = team_info.get("school", "Unknown Team")
+        
+        # Position mapping for organization
+        position_groups = {
+            # Offense
+            "Quarterback": {"group": "offense", "positions": ["QB"], "depth": 3},
+            "Running Back": {"group": "offense", "positions": ["RB", "FB"], "depth": 4},
+            "Wide Receiver": {"group": "offense", "positions": ["WR"], "depth": 6},
+            "Tight End": {"group": "offense", "positions": ["TE"], "depth": 3},
+            "Offensive Lineman": {"group": "offense", "positions": ["OL", "OT", "OG", "C"], "depth": 8},
+            
+            # Defense  
+            "Defensive Lineman": {"group": "defense", "positions": ["DL", "DE", "NT"], "depth": 6},
+            "Defensive Tackle": {"group": "defense", "positions": ["DT"], "depth": 4},
+            "Defensive End": {"group": "defense", "positions": ["DE"], "depth": 4},
+            "Linebacker": {"group": "defense", "positions": ["LB", "ILB", "OLB", "MLB"], "depth": 6},
+            "Cornerback": {"group": "defense", "positions": ["CB"], "depth": 4},
+            "Safety": {"group": "defense", "positions": ["S", "SS", "FS"], "depth": 4},
+            "Defensive Back": {"group": "defense", "positions": ["DB"], "depth": 4},
+            
+            # Special Teams
+            "Place kicker": {"group": "special_teams", "positions": ["PK", "K"], "depth": 2},
+            "Punter": {"group": "special_teams", "positions": ["P"], "depth": 2},
+            "Long Snapper": {"group": "special_teams", "positions": ["LS"], "depth": 2},
+        }
+        
+        # Group players by position
+        position_players = {}
+        for athlete in athletes:
+            position = athlete.get("position")
+            if not position:
+                continue
+                
+            pos_name = position.get("name", "Unknown")
+            pos_abbr = position.get("abbreviation", "")
+            
+            if pos_name not in position_players:
+                position_players[pos_name] = []
+                
+            # Calculate class year based on athleteTeams years
+            class_year = "Sr"  # Default
+            athlete_teams = athlete.get("athleteTeams", [])
+            if athlete_teams:
+                start_year = athlete_teams[0].get("startYear")
+                end_year = athlete_teams[0].get("endYear") 
+                if start_year and end_year:
+                    years_played = end_year - start_year + 1
+                    if years_played == 1:
+                        class_year = "Fr"
+                    elif years_played == 2:
+                        class_year = "So"
+                    elif years_played == 3:
+                        class_year = "Jr"
+                    elif years_played >= 4:
+                        class_year = "Sr"
+            
+            player_info = {
+                "name": athlete.get("name", "Unknown"),
+                "jersey": athlete.get("jersey"),
+                "height": athlete.get("height"),
+                "weight": athlete.get("weight"),
+                "class_year": class_year,
+                "position_abbr": pos_abbr
+            }
+            
+            position_players[pos_name].append(player_info)
+        
+        # Extract filter parameters from context
+        context = context or {}
+        offensive_only = context.get('offensive_only', False)
+        defensive_only = context.get('defensive_only', False)
+        include_special_teams = context.get('include_special_teams', True)
+        
+        # Organize into depth chart
+        depth_chart = {"offense": {}, "defense": {}, "special_teams": {}}
+        
+        for pos_name, players in position_players.items():
+            if pos_name in position_groups:
+                group_info = position_groups[pos_name]
+                group = group_info["group"]
+                max_depth = group_info["depth"]
+                
+                # Apply filtering logic
+                if offensive_only and group != "offense":
+                    continue
+                if defensive_only and group != "defense":
+                    continue
+                if not include_special_teams and group == "special_teams":
+                    continue
+                
+                # Sort players by jersey number (lower numbers typically starters)
+                players_sorted = sorted(players, key=lambda p: p.get("jersey") or 99)
+                
+                # Take only the number we want for depth chart
+                depth_players = players_sorted[:max_depth]
+                
+                # Format position display
+                if depth_players:
+                    formatted_players = []
+                    for i, player in enumerate(depth_players):
+                        jersey = f"#{player['jersey']}" if player['jersey'] else ""
+                        name = player['name']
+                        class_yr = player['class_year']
+                        height = f"{player['height']//12}'{player['height']%12}\"" if player['height'] else ""
+                        weight = f"{player['weight']}lbs" if player['weight'] else ""
+                        
+                        # Create player string
+                        player_str = f"{name} ({jersey}, {class_yr})"
+                        if height and weight:
+                            player_str += f" - {height}, {weight}"
+                        
+                        formatted_players.append(player_str)
+                    
+                    # Use position abbreviation if available, otherwise position name
+                    pos_key = players[0]['position_abbr'] or pos_name
+                    depth_chart[group][pos_key] = formatted_players
+        
+        # Create summary
+        total_players = sum(len(players) for players in depth_chart.values() for players in players.values())
+        
+        summary = {
+            "team": team_name,
+            "total_players": total_players,
+            "description": f"Depth chart for {team_name} showing key players by position",
+            "offense_positions": len(depth_chart["offense"]),
+            "defense_positions": len(depth_chart["defense"]),
+            "special_teams_positions": len(depth_chart["special_teams"])
+        }
+        
+        return create_formatted_response(raw_data, summary, depth_chart, include_raw_data)
+        
+    except Exception as e:
+        return json.dumps({
+            "error": f"Failed to format depth chart response: {str(e)}",
             "raw_data": raw_data if include_raw_data else None
         }, indent=2)
 
@@ -816,7 +1085,8 @@ def format_generic_graphql_response(raw_data: str, include_raw_data: bool = Fals
 def safe_format_response(
     raw_data: str, 
     response_type: str, 
-    include_raw_data: bool = False
+    include_raw_data: bool = False,
+    context: dict = None
 ) -> str:
     """
     Safely format response with fallback to raw data on error.
@@ -826,6 +1096,7 @@ def safe_format_response(
         raw_data: Raw JSON response
         response_type: Type of response (teams, games, betting, rankings, athletes, metrics, generic)
         include_raw_data: Whether to include raw data
+        context: Additional context for formatting
         
     Returns:
         YAML formatted response or raw data if formatting fails
@@ -836,6 +1107,7 @@ def safe_format_response(
         'betting': format_betting_response,
         'rankings': format_rankings_response,
         'athletes': format_athletes_response,
+        'depth_chart': format_depth_chart_response,
         'metrics': format_metrics_response,
         'team_ratings': format_team_ratings_response,
         'generic': format_generic_graphql_response
@@ -844,7 +1116,10 @@ def safe_format_response(
     formatter = formatters.get(response_type)
     if formatter:
         try:
-            return formatter(raw_data, include_raw_data)
+            if response_type in ['rankings', 'depth_chart'] and context:
+                return formatter(raw_data, include_raw_data, context)
+            else:
+                return formatter(raw_data, include_raw_data)
         except Exception as e:
             # Fallback to generic formatting
             try:

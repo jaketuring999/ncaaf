@@ -224,3 +224,12 @@ ratings(where: { season: { _eq: $season }}) {
 - GraphQL schema remains stable
 - No breaking changes to tool interfaces
 - Existing tests pass with enhancements
+
+Rating Systems (ratings type):
+Contains multiple ranking fields:
+fpiAvgWinProbabilityRank
+fpiGameControlRank
+fpiRemainingSosRank
+fpiResumeRank
+fpiSosRank
+fpiStrengthOfRecordRank
