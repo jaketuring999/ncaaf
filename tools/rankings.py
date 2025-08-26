@@ -13,41 +13,7 @@ from src.graphql_executor import execute_graphql
 from utils.param_utils import preprocess_ranking_params, safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
 from utils.response_formatter import safe_format_response
-
-# GraphQL query for rankings data
-GET_RANKINGS_QUERY = """
-query GetRankings($season: Int, $week: smallint) {
-    poll(
-        where: {
-            season: { _eq: $season }
-            week: { _eq: $week }
-        }
-        orderBy: { week: ASC }
-    ) {
-        season
-        seasonType
-        week
-        pollType {
-            name
-            abbreviation
-        }
-        rankings(
-            orderBy: { rank: ASC }
-        ) {
-            rank
-            firstPlaceVotes
-            points
-            team {
-                teamId
-                school
-                conference
-                abbreviation
-            }
-        }
-    }
-}
-"""
-
+from queries.rankings import GET_RANKINGS_QUERY
 @mcp.tool()
 async def GetRankings(
     season: Annotated[Optional[Union[str, int]], "Season year"] = None,

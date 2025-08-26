@@ -10,23 +10,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
 from src.graphql_executor import execute_graphql, build_query_variables
-
-# Placeholder - will implement later
-SEARCH_ENTITIES_QUERY = """
-query SearchEntities($searchTerm: String!) {
-    currentTeams(
-        where: {
-            school: { _ilike: $searchTerm }
-        }
-        limit: 10
-    ) {
-        teamId
-        school
-        conference
-    }
-}
-"""
-
+from queries.search import SEARCH_ENTITIES_QUERY
 @mcp.tool()
 async def SearchEntities(
     search_term: Annotated[str, "Text to search for across teams, players, and coaches"]

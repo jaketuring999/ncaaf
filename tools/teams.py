@@ -15,133 +15,15 @@ from src.graphql_executor import execute_graphql
 from utils.param_utils import preprocess_team_params, validate_team_lookup_params, safe_int_conversion, safe_string_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables, format_search_pattern
 from utils.response_formatter import safe_format_response
-
-# GraphQL queries for team operations
-GET_TEAMS_QUERY = """
-query GetTeams($conference: String, $division: String, $search: String, $limit: Int) {
-    currentTeams(
-        where: {where_clause}
-        orderBy: { school: ASC }
-        limit: $limit
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
-
-GET_TEAMS_ALL_QUERY = """
-query GetTeamsAll($limit: Int) {
-    currentTeams(
-        orderBy: { school: ASC }
-        limit: $limit
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
-
-GET_TEAMS_BY_CONFERENCE_QUERY = """
-query GetTeamsByConference($conference: String!, $limit: Int) {
-    currentTeams(
-        where: { conference: { _eq: $conference } }
-        orderBy: { school: ASC }
-        limit: $limit
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
-
-GET_TEAMS_BY_DIVISION_QUERY = """
-query GetTeamsByDivision($division: String!, $limit: Int) {
-    currentTeams(
-        where: { division: { _eq: $division } }
-        orderBy: { school: ASC }
-        limit: $limit
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
-
-SEARCH_TEAMS_QUERY = """
-query SearchTeams($searchTerm: String!, $limit: Int) {
-    currentTeams(
-        where: {
-            _or: [
-                { school: { _ilike: $searchTerm } }
-                { abbreviation: { _ilike: $searchTerm } }
-            ]
-        }
-        orderBy: { school: ASC }
-        limit: $limit
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
-
-GET_TEAM_DETAILS_QUERY_BY_ID = """
-query GetTeamDetailsById($teamId: Int!) {
-    currentTeams(
-        where: { teamId: { _eq: $teamId } }
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
-
-GET_TEAM_DETAILS_QUERY_BY_NAME = """
-query GetTeamDetailsByName($school: String!) {
-    currentTeams(
-        where: { school: { _ilike: $school } }
-    ) {
-        teamId
-        school
-        conference
-        conferenceId
-        division
-        classification
-        abbreviation
-    }
-}
-"""
+from queries.teams import (
+    GET_TEAMS_QUERY,
+    GET_TEAMS_ALL_QUERY,
+    GET_TEAMS_BY_CONFERENCE_QUERY,
+    GET_TEAMS_BY_DIVISION_QUERY,
+    SEARCH_TEAMS_QUERY,
+    GET_TEAM_DETAILS_QUERY_BY_ID,
+    GET_TEAM_DETAILS_QUERY_BY_NAME
+)
 
 @mcp.tool()
 async def GetTeams(

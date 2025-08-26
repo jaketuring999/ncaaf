@@ -14,29 +14,7 @@ from utils.param_utils import safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
 from utils.response_formatter import safe_format_response
 from utils.team_resolver import resolve_optional_team_id
-
-# Placeholder - will implement later
-GET_ADVANCED_METRICS_QUERY = """
-query GetAdvancedMetrics($teamId: Int, $season: smallint) {
-    adjustedTeamMetrics(
-        where: {
-            teamId: { _eq: $teamId }
-            year: { _eq: $season }
-        }
-    ) {
-        teamId
-        year
-        epa
-        epaAllowed
-        explosiveness
-        success
-        team {
-            school
-        }
-    }
-}
-"""
-
+from queries.metrics import GET_ADVANCED_METRICS_QUERY
 @mcp.tool()
 async def GetAdvancedMetrics(
     team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,

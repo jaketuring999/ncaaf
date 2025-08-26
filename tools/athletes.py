@@ -14,78 +14,7 @@ from utils.param_utils import safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
 from utils.response_formatter import safe_format_response
 from utils.team_resolver import resolve_optional_team_id
-
-# GraphQL query for athlete data
-GET_ATHLETES_QUERY = """
-query GetAthletes($teamId: Int, $season: smallint) {
-    athlete(
-        where: {
-            athleteTeams: {
-                teamId: { _eq: $teamId }
-                startYear: { _lte: $season }
-                endYear: { _gte: $season }
-            }
-        }
-        limit: 100
-    ) {
-        id
-        name
-        firstName
-        lastName
-        weight
-        height
-        jersey
-        positionId
-        teamId
-        
-        athleteTeams {
-            teamId
-            startYear
-            endYear
-            team {
-                school
-                abbreviation
-                conference
-            }
-        }
-    }
-}
-"""
-
-GET_ATHLETES_QUERY_NO_SEASON = """
-query GetAthletes($teamId: Int) {
-    athlete(
-        where: {
-            athleteTeams: {
-                teamId: { _eq: $teamId }
-            }
-        }
-        limit: 100
-    ) {
-        id
-        name
-        firstName
-        lastName
-        weight
-        height
-        jersey
-        positionId
-        teamId
-        
-        athleteTeams {
-            teamId
-            startYear
-            endYear
-            team {
-                school
-                abbreviation
-                conference
-            }
-        }
-    }
-}
-"""
-
+from queries.athletes import GET_ATHLETES_QUERY
 @mcp.tool()
 async def GetAthletes(
     team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,

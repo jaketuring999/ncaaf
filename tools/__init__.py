@@ -10,3 +10,4 @@ from . import betting
 from . import athletes
 from . import metrics
 from . import schema
+from . import search

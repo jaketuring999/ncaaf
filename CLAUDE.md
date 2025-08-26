@@ -74,3 +74,5 @@ async def tool_name(param: str) -> str:
 **Athletes**: Player rosters and statistics
 **Metrics**: Advanced team performance analytics
 **Schema**: GraphQL schema exploration and introspection
+
+# run fast mcp server with git ls-files | entr -r fastmcp run server.py --transport http --port 8345
