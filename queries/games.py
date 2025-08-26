@@ -54,22 +54,6 @@ query GetGames(
         # Line Scores (quarter by quarter)
         awayLineScores
         homeLineScores
-        excitement
-        conferenceGame
-        
-        # ELO Ratings
-        awayStartElo
-        homeStartElo
-        awayEndElo
-        homeEndElo
-        
-        # Win Probabilities
-        awayPostgameWinProb
-        homePostgameWinProb
-        
-        # Line Scores (quarter by quarter)
-        awayLineScores
-        homeLineScores
         
         homeTeamInfo {
             teamId
@@ -153,22 +137,6 @@ query GetGames(
         homePoints
         awayPoints
         notes
-        excitement
-        conferenceGame
-        
-        # ELO Ratings
-        awayStartElo
-        homeStartElo
-        awayEndElo
-        homeEndElo
-        
-        # Win Probabilities
-        awayPostgameWinProb
-        homePostgameWinProb
-        
-        # Line Scores (quarter by quarter)
-        awayLineScores
-        homeLineScores
         excitement
         conferenceGame
         
