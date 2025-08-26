@@ -211,6 +211,7 @@ def preprocess_game_params(
     season: Union[str, int, None] = None,
     week: Union[str, int, None] = None,
     team_id: Union[str, int, None] = None,
+    season_type: Union[str, None] = None,
     limit: Union[str, int, None] = None,
     include_betting_lines: Union[str, bool] = False,
     include_weather: Union[str, bool] = False,
@@ -228,6 +229,7 @@ def preprocess_game_params(
         season: Season year (can be string or int)
         week: Week number (can be string or int)
         team_id: Resolved team ID (integer from team resolver)
+        season_type: Season type filter ("regular", "postseason", or None for both)
         limit: Result limit (can be string or int)
         include_betting_lines: Include betting data (can be string or bool)
         include_weather: Include weather data (can be string or bool)
@@ -251,6 +253,15 @@ def preprocess_game_params(
     if team_id is not None:
         params['team_id'] = safe_int_conversion(team_id, 'team_id')
     
+    # Season type validation
+    if season_type is not None:
+        season_type_cleaned = safe_string_conversion(season_type, 'season_type')
+        if season_type_cleaned and season_type_cleaned.lower() not in ['regular', 'postseason']:
+            raise ValueError(f"season_type must be 'regular' or 'postseason', got '{season_type_cleaned}'")
+        params['season_type'] = season_type_cleaned.lower() if season_type_cleaned else None
+    else:
+        params['season_type'] = None
+    
     # Limit with validation
     params['limit'] = validate_limit(limit, default=100, max_limit=1000)
     
@@ -273,6 +284,7 @@ def preprocess_betting_params(
     season: Union[str, int, None] = None,
     week: Union[str, int, None] = None,
     team_id: Union[str, int, None] = None,
+    season_type: Union[str, None] = None,
     limit: Union[str, int, None] = None,
     calculate_records: Union[str, bool] = False,
     calculate_trends: Union[str, bool] = False,
@@ -287,6 +299,7 @@ def preprocess_betting_params(
         season: Season year (can be string or int)
         week: Week number (can be string or int)
         team_id: Resolved team ID (integer from team resolver)
+        season_type: Season type filter ("regular", "postseason", or None for both)
         limit: Result limit (can be string or int)
         calculate_records: Calculate betting records (can be string or bool)
         calculate_trends: Calculate betting trends (can be string or bool)
@@ -306,6 +319,15 @@ def preprocess_betting_params(
     
     if team_id is not None:
         params['team_id'] = safe_int_conversion(team_id, 'team_id')
+    
+    # Season type validation
+    if season_type is not None:
+        season_type_cleaned = safe_string_conversion(season_type, 'season_type')
+        if season_type_cleaned and season_type_cleaned.lower() not in ['regular', 'postseason']:
+            raise ValueError(f"season_type must be 'regular' or 'postseason', got '{season_type_cleaned}'")
+        params['season_type'] = season_type_cleaned.lower() if season_type_cleaned else None
+    else:
+        params['season_type'] = None
     
     # Limit with validation
     params['limit'] = validate_limit(limit, default=50, max_limit=500)

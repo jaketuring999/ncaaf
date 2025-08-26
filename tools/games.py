@@ -10,13 +10,98 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from mcp_instance import mcp
 from src.graphql_executor import execute_graphql
-from utils.param_utils import preprocess_game_params, safe_int_conversion, safe_bool_conversion
+from utils.param_utils import preprocess_game_params, safe_int_conversion, safe_bool_conversion, safe_string_conversion
 from utils.graphql_utils import build_query_variables
 from utils.response_formatter import safe_format_response
 from utils.team_resolver import resolve_optional_team_id
 
 # GraphQL queries for game data
-# Query for games with both season and week
+# Query for games with season, week, and seasonType
+GET_GAMES_WITH_SEASON_WEEK_SEASONTYPE_QUERY = """
+query GetGames(
+    $season: smallint!
+    $week: smallint!
+    $seasonType: season_type!
+    $includeBettingLines: Boolean = false
+    $includeWeather: Boolean = false
+    $includeMedia: Boolean = false
+    $limit: Int
+) {
+    game(
+        where: {
+            season: { _eq: $season }
+            week: { _eq: $week }
+            seasonType: { _eq: $seasonType }
+        }
+        orderBy: [
+            { startDate: ASC }
+            { id: ASC }
+        ]
+        limit: $limit
+    ) {
+        id
+        season
+        seasonType
+        week
+        startDate
+        startTimeTbd
+        status
+        neutralSite
+        attendance
+        venueId
+        homePoints
+        awayPoints
+        notes
+        
+        homeTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        awayTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        weather @include(if: $includeWeather) {
+            condition {
+                id
+                description
+            }
+            temperature
+            dewpoint
+            humidity
+            precipitation
+            pressure
+            snowfall
+            windDirection
+            windGust
+            windSpeed
+            weatherConditionCode
+        }
+        
+        mediaInfo @include(if: $includeMedia) {
+            mediaType
+            name
+        }
+        
+        lines @include(if: $includeBettingLines) {
+            spread
+            spreadOpen
+            moneylineHome
+            moneylineAway
+            overUnder
+            overUnderOpen
+        }
+    }
+}
+"""
+
+# Query for games with both season and week (without seasonType)
 GET_GAMES_WITH_SEASON_WEEK_QUERY = """
 query GetGames(
     $season: smallint!
@@ -30,6 +115,89 @@ query GetGames(
         where: {
             season: { _eq: $season }
             week: { _eq: $week }
+        }
+        orderBy: [
+            { startDate: ASC }
+            { id: ASC }
+        ]
+        limit: $limit
+    ) {
+        id
+        season
+        seasonType
+        week
+        startDate
+        startTimeTbd
+        status
+        neutralSite
+        attendance
+        venueId
+        homePoints
+        awayPoints
+        notes
+        
+        homeTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        awayTeamInfo {
+            teamId
+            school
+            abbreviation
+            conference
+        }
+        
+        weather @include(if: $includeWeather) {
+            condition {
+                id
+                description
+            }
+            temperature
+            dewpoint
+            humidity
+            precipitation
+            pressure
+            snowfall
+            windDirection
+            windGust
+            windSpeed
+            weatherConditionCode
+        }
+        
+        mediaInfo @include(if: $includeMedia) {
+            mediaType
+            name
+        }
+        
+        lines @include(if: $includeBettingLines) {
+            spread
+            spreadOpen
+            moneylineHome
+            moneylineAway
+            overUnder
+            overUnderOpen
+        }
+    }
+}
+"""
+
+# Query for games with season and seasonType
+GET_GAMES_WITH_SEASON_SEASONTYPE_QUERY = """
+query GetGames(
+    $season: smallint!
+    $seasonType: season_type!
+    $includeBettingLines: Boolean = false
+    $includeWeather: Boolean = false
+    $includeMedia: Boolean = false
+    $limit: Int
+) {
+    game(
+        where: {
+            season: { _eq: $season }
+            seasonType: { _eq: $seasonType }
         }
         orderBy: [
             { startDate: ASC }
@@ -522,6 +690,7 @@ async def GetGames(
     season: Annotated[Optional[Union[str, int]], "Season year"] = None,
     week: Annotated[Optional[Union[str, int]], "Week number (1-15 for regular season)"] = None,
     team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
+    season_type: Annotated[Optional[str], "Season type filter ('regular', 'postseason', or None for both)"] = None,
     include_betting_lines: Annotated[Union[str, bool], "Include betting line information"] = False,
     include_weather: Annotated[Union[str, bool], "Include weather data"] = False,
     include_media: Annotated[Union[str, bool], "Include media/TV information"] = False,
@@ -536,6 +705,7 @@ async def GetGames(
         season: Season year (e.g., 2024 or "2024")
         week: Week number (1-15 for regular season, can be string or int)
         team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
+        season_type: Season type filter ("regular", "postseason", or None for both)
         include_betting_lines: Include betting line information (can be string or bool)
         include_weather: Include weather data (can be string or bool)
         include_media: Include media/TV information (can be string or bool)
@@ -557,6 +727,7 @@ async def GetGames(
         season=season,
         week=week,
         team_id=team_id,
+        season_type=season_type,
         limit=limit,
         include_betting_lines=include_betting_lines,
         include_weather=include_weather,
@@ -581,6 +752,22 @@ async def GetGames(
             )
             result = await execute_graphql(GET_TEAM_GAMES_QUERY, variables)
         
+        # Apply client-side seasonType filtering for team games if specified
+        if season_type is not None:
+            try:
+                import json
+                result_data = json.loads(result)
+                if 'data' in result_data and 'game' in result_data['data']:
+                    filtered_games = [
+                        game for game in result_data['data']['game'] 
+                        if game.get('seasonType') == season_type
+                    ]
+                    result_data['data']['game'] = filtered_games
+                    result = json.dumps(result_data, indent=2)
+            except Exception:
+                # Don't fail the main query if filtering fails
+                pass
+        
         # Format response based on include_raw_data flag
         if include_raw_data_bool:
             return result
@@ -590,28 +777,52 @@ async def GetGames(
     # Select appropriate query based on which parameters are provided
     season = processed.get('season')
     week = processed.get('week')
+    season_type = processed.get('season_type')
     
     if season is not None and week is not None:
         # Both season and week provided
-        query = GET_GAMES_WITH_SEASON_WEEK_QUERY
-        variables = build_query_variables(
-            season=season,
-            week=week,
-            includeBettingLines=processed.get('include_betting_lines', False),
-            includeWeather=processed.get('include_weather', False),
-            includeMedia=processed.get('include_media', False),
-            limit=processed.get('limit')
-        )
+        if season_type is not None:
+            query = GET_GAMES_WITH_SEASON_WEEK_SEASONTYPE_QUERY
+            variables = build_query_variables(
+                season=season,
+                week=week,
+                seasonType=season_type,
+                includeBettingLines=processed.get('include_betting_lines', False),
+                includeWeather=processed.get('include_weather', False),
+                includeMedia=processed.get('include_media', False),
+                limit=processed.get('limit')
+            )
+        else:
+            query = GET_GAMES_WITH_SEASON_WEEK_QUERY
+            variables = build_query_variables(
+                season=season,
+                week=week,
+                includeBettingLines=processed.get('include_betting_lines', False),
+                includeWeather=processed.get('include_weather', False),
+                includeMedia=processed.get('include_media', False),
+                limit=processed.get('limit')
+            )
     elif season is not None:
         # Only season provided
-        query = GET_GAMES_WITH_SEASON_QUERY
-        variables = build_query_variables(
-            season=season,
-            includeBettingLines=processed.get('include_betting_lines', False),
-            includeWeather=processed.get('include_weather', False),
-            includeMedia=processed.get('include_media', False),
-            limit=processed.get('limit')
-        )
+        if season_type is not None:
+            query = GET_GAMES_WITH_SEASON_SEASONTYPE_QUERY
+            variables = build_query_variables(
+                season=season,
+                seasonType=season_type,
+                includeBettingLines=processed.get('include_betting_lines', False),
+                includeWeather=processed.get('include_weather', False),
+                includeMedia=processed.get('include_media', False),
+                limit=processed.get('limit')
+            )
+        else:
+            query = GET_GAMES_WITH_SEASON_QUERY
+            variables = build_query_variables(
+                season=season,
+                includeBettingLines=processed.get('include_betting_lines', False),
+                includeWeather=processed.get('include_weather', False),
+                includeMedia=processed.get('include_media', False),
+                limit=processed.get('limit')
+            )
     elif week is not None:
         # Only week provided
         query = GET_GAMES_WITH_WEEK_QUERY
@@ -673,6 +884,7 @@ async def GetGames(
 async def GetGamesByWeek(
     season: Annotated[Union[str, int], "Season year"],
     week: Annotated[Union[str, int], "Week number (1-15 for regular season)"],
+    season_type: Annotated[Optional[str], "Season type filter ('regular', 'postseason', or None for both)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return"] = None,
     calculate_weekly_trends: Annotated[Union[str, bool], "Calculate weekly betting and scoring trends"] = False,
     include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
@@ -683,6 +895,7 @@ async def GetGamesByWeek(
     Args:
         season: Season year (e.g., 2024 or "2024")
         week: Week number (1-15 for regular season, can be string or int)
+        season_type: Season type filter ("regular", "postseason", or None for both)
         limit: Maximum number of games to return (can be string or int)
         calculate_weekly_trends: Calculate weekly betting and scoring trends (default: false)
         include_raw_data: Include raw GraphQL response data (default: false)
@@ -697,10 +910,34 @@ async def GetGamesByWeek(
     calculate_weekly_trends_bool = safe_bool_conversion(calculate_weekly_trends, 'calculate_weekly_trends')
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
+    # Process season_type parameter
+    season_type_processed = None
+    if season_type is not None:
+        season_type_cleaned = safe_string_conversion(season_type, 'season_type')
+        if season_type_cleaned and season_type_cleaned.lower() not in ['regular', 'postseason']:
+            raise ValueError(f"season_type must be 'regular' or 'postseason', got '{season_type_cleaned}'")
+        season_type_processed = season_type_cleaned.lower() if season_type_cleaned else None
+    
     variables = build_query_variables(season=season_int, week=week_int, limit=limit_int)
     
     # Execute the GraphQL query
     result = await execute_graphql(GET_GAMES_BY_WEEK_QUERY, variables)
+    
+    # Apply client-side seasonType filtering if specified
+    if season_type_processed is not None:
+        try:
+            import json
+            result_data = json.loads(result)
+            if 'data' in result_data and 'game' in result_data['data']:
+                filtered_games = [
+                    game for game in result_data['data']['game'] 
+                    if game.get('seasonType') == season_type_processed
+                ]
+                result_data['data']['game'] = filtered_games
+                result = json.dumps(result_data, indent=2)
+        except Exception:
+            # Don't fail the main query if filtering fails
+            pass
     
     # Add weekly trends analysis if requested
     if calculate_weekly_trends_bool:
@@ -740,6 +977,7 @@ async def GetGamesByWeek(
 async def GetTeamGames(
     team: Annotated[str, "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"],
     season: Annotated[Optional[Union[str, int]], "Season year"] = None,
+    season_type: Annotated[Optional[str], "Season type filter ('regular', 'postseason', or None for both)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return"] = None,
     calculate_performance: Annotated[Union[str, bool], "Calculate team performance metrics"] = False,
     include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
@@ -750,6 +988,7 @@ async def GetTeamGames(
     Args:
         team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
         season: Season year (optional, can be string or int)
+        season_type: Season type filter ("regular", "postseason", or None for both)
         limit: Maximum number of games to return (can be string or int)
         calculate_performance: Calculate team performance metrics (default: false)
         include_raw_data: Include raw GraphQL response data (default: false)
@@ -765,6 +1004,14 @@ async def GetTeamGames(
     calculate_performance_bool = safe_bool_conversion(calculate_performance, 'calculate_performance')
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
+    # Process season_type parameter
+    season_type_processed = None
+    if season_type is not None:
+        season_type_cleaned = safe_string_conversion(season_type, 'season_type')
+        if season_type_cleaned and season_type_cleaned.lower() not in ['regular', 'postseason']:
+            raise ValueError(f"season_type must be 'regular' or 'postseason', got '{season_type_cleaned}'")
+        season_type_processed = season_type_cleaned.lower() if season_type_cleaned else None
+    
     # Select appropriate query based on whether season is provided
     if season_int is not None:
         query = GET_TEAM_GAMES_WITH_SEASON_QUERY
@@ -775,6 +1022,22 @@ async def GetTeamGames(
     
     # Execute the GraphQL query
     result = await execute_graphql(query, variables)
+    
+    # Apply client-side seasonType filtering if specified
+    if season_type_processed is not None:
+        try:
+            import json
+            result_data = json.loads(result)
+            if 'data' in result_data and 'game' in result_data['data']:
+                filtered_games = [
+                    game for game in result_data['data']['game'] 
+                    if game.get('seasonType') == season_type_processed
+                ]
+                result_data['data']['game'] = filtered_games
+                result = json.dumps(result_data, indent=2)
+        except Exception:
+            # Don't fail the main query if filtering fails
+            pass
     
     # Add team performance analysis if requested
     if calculate_performance_bool:

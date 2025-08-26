@@ -306,6 +306,7 @@ async def GetBettingLines(
     season: Annotated[Optional[Union[str, int]], "Season year"] = None,
     week: Annotated[Optional[Union[str, int]], "Week number"] = None,
     team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
+    season_type: Annotated[Optional[str], "Season type filter ('regular', 'postseason', or None for both)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return"] = 50,
     calculate_records: Annotated[Union[str, bool], "Calculate ATS, Over/Under, and SU records"] = False,
     include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
@@ -317,6 +318,7 @@ async def GetBettingLines(
         season: Season year (e.g., 2024 or "2024")
         week: Week number (can be string or int)
         team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
+        season_type: Season type filter ("regular", "postseason", or None for both)
         limit: Maximum number of games to return (default: 50, can be string or int)
         calculate_records: Calculate ATS, Over/Under, and SU records (default: false)
         include_raw_data: Include raw GraphQL response data (default: false)
@@ -334,6 +336,7 @@ async def GetBettingLines(
         season=season,
         week=week,
         team_id=team_id,
+        season_type=season_type,
         limit=limit,
         calculate_records=calculate_records
     )
@@ -342,6 +345,7 @@ async def GetBettingLines(
     season_int = params.get('season')
     week_int = params.get('week')
     team_id_int = params.get('team_id')
+    season_type_str = params.get('season_type')
     limit_int = params.get('limit')
     calculate_records_bool = params.get('calculate_records')
     
@@ -373,6 +377,22 @@ async def GetBettingLines(
     
     # Execute the GraphQL query
     result = await execute_graphql(query, variables)
+    
+    # Apply client-side seasonType filtering if specified
+    if season_type_str is not None:
+        try:
+            import json
+            result_data = json.loads(result)
+            if 'data' in result_data and 'game' in result_data['data']:
+                filtered_games = [
+                    game for game in result_data['data']['game'] 
+                    if game.get('seasonType') == season_type_str
+                ]
+                result_data['data']['game'] = filtered_games
+                result = json.dumps(result_data, indent=2)
+        except Exception:
+            # Don't fail the main query if filtering fails
+            pass
     
     # Add betting analysis if requested and we have a team_id
     if calculate_records_bool and team_id_int:
