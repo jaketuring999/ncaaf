@@ -519,15 +519,15 @@ query GetRecentGames($limit: Int) {
 
 @mcp.tool()
 async def GetGames(
-    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
-    week: Annotated[Optional[Union[str, int]], "Week number (1-15 for regular season, can be string or int)"] = None,
+    season: Annotated[Optional[Union[str, int]], "Season year"] = None,
+    week: Annotated[Optional[Union[str, int]], "Week number (1-15 for regular season)"] = None,
     team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
-    include_betting_lines: Annotated[Union[str, bool], "Include betting line information (can be string or bool)"] = False,
-    include_weather: Annotated[Union[str, bool], "Include weather data (can be string or bool)"] = False,
-    include_media: Annotated[Union[str, bool], "Include media/TV information (can be string or bool)"] = False,
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
-    calculate_stats: Annotated[Union[str, bool], "Calculate game statistics and trends (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    include_betting_lines: Annotated[Union[str, bool], "Include betting line information"] = False,
+    include_weather: Annotated[Union[str, bool], "Include weather data"] = False,
+    include_media: Annotated[Union[str, bool], "Include media/TV information"] = False,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return"] = None,
+    calculate_stats: Annotated[Union[str, bool], "Calculate game statistics and trends"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get games with flexible filtering options.
@@ -671,11 +671,11 @@ async def GetGames(
 
 @mcp.tool()
 async def GetGamesByWeek(
-    season: Annotated[Union[str, int], "Season year (e.g., 2024 or '2024')"],
-    week: Annotated[Union[str, int], "Week number (1-15 for regular season, can be string or int)"],
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
-    calculate_weekly_trends: Annotated[Union[str, bool], "Calculate weekly betting and scoring trends (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    season: Annotated[Union[str, int], "Season year"],
+    week: Annotated[Union[str, int], "Week number (1-15 for regular season)"],
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return"] = None,
+    calculate_weekly_trends: Annotated[Union[str, bool], "Calculate weekly betting and scoring trends"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get all games for a specific week and season.
@@ -739,10 +739,10 @@ async def GetGamesByWeek(
 @mcp.tool()
 async def GetTeamGames(
     team: Annotated[str, "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"],
-    season: Annotated[Optional[Union[str, int]], "Season year (optional, can be string or int)"] = None,
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
-    calculate_performance: Annotated[Union[str, bool], "Calculate team performance metrics (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    season: Annotated[Optional[Union[str, int]], "Season year"] = None,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return"] = None,
+    calculate_performance: Annotated[Union[str, bool], "Calculate team performance metrics"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get all games for a specific team.
@@ -812,8 +812,8 @@ async def GetTeamGames(
 
 @mcp.tool()
 async def GetRecentGames(
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of recent games to return (default: 20, can be string or int)"] = 20,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of recent games to return"] = 20,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get recently completed games.

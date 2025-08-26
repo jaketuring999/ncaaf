@@ -40,8 +40,8 @@ query GetAdvancedMetrics($teamId: Int, $season: smallint) {
 @mcp.tool()
 async def GetAdvancedMetrics(
     team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
-    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    season: Annotated[Optional[Union[str, int]], "Season year"] = None,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get advanced team metrics.

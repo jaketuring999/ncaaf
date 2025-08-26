@@ -50,10 +50,10 @@ query GetRankings($season: Int, $week: smallint) {
 
 @mcp.tool()
 async def GetRankings(
-    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
-    week: Annotated[Optional[Union[str, int]], "Week number (can be string or int)"] = None,
-    calculate_movement: Annotated[Union[str, bool], "Calculate ranking movement and trends (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    season: Annotated[Optional[Union[str, int]], "Season year"] = None,
+    week: Annotated[Optional[Union[str, int]], "Week number"] = None,
+    calculate_movement: Annotated[Union[str, bool], "Calculate ranking movement and trends"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get college football rankings for a specific season and week.

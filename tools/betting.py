@@ -303,12 +303,12 @@ query GetBettingLines($limit: Int) {
 
 @mcp.tool() 
 async def GetBettingLines(
-    season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
-    week: Annotated[Optional[Union[str, int]], "Week number (can be string or int)"] = None,
+    season: Annotated[Optional[Union[str, int]], "Season year"] = None,
+    week: Annotated[Optional[Union[str, int]], "Week number"] = None,
     team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (default: 50, can be string or int)"] = 50,
-    calculate_records: Annotated[Union[str, bool], "Calculate ATS, Over/Under, and SU records (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return"] = 50,
+    calculate_records: Annotated[Union[str, bool], "Calculate ATS, Over/Under, and SU records"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get betting lines for games.
@@ -415,10 +415,10 @@ async def GetBettingAnalysis(
     team: Annotated[str, "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"],
     opponent: Annotated[Optional[str], "Opponent team name, abbreviation, or ID for head-to-head analysis"] = None,
     analysis_type: Annotated[str, "Analysis type: 'spread_ranges', 'over_under', 'h2h', 'trends', or 'all' (default)"] = "all",
-    season: Annotated[Optional[Union[str, int]], "Season year (default: current season)"] = None,
+    season: Annotated[Optional[Union[str, int]], "Season year"] = None,
     scenario: Annotated[Optional[str], "Betting scenario: 'road_underdog', 'home_favorite', 'road_favorite', 'home_underdog'"] = None,
-    last_n_games: Annotated[Optional[Union[str, int]], "Number of recent games for trend analysis (default: 10)"] = 10,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    last_n_games: Annotated[Optional[Union[str, int]], "Number of recent games for trend analysis"] = 10,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Advanced betting analysis tool for specific analytical questions.

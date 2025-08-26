@@ -314,11 +314,11 @@ async def SchemaExplorer(
     operation: Annotated[str, "Operation to perform - 'search', 'types', 'fields', 'details', 'stats'"],
     query: Annotated[Optional[str], "Search query or type name (for search/details operations)"] = None,
     kind: Annotated[Optional[str], "Filter by type kind - OBJECT, SCALAR, ENUM, INPUT_OBJECT (for types operation)"] = None,
-    limit: Annotated[Optional[Union[str, int]], "Maximum results to return (default: 25)"] = 25,
-    offset: Annotated[Optional[Union[str, int]], "Pagination offset (default: 0)"] = 0,
+    limit: Annotated[Optional[Union[str, int]], "Maximum results to return"] = 25,
+    offset: Annotated[Optional[Union[str, int]], "Pagination offset"] = 0,
     include_fields: Annotated[Union[str, bool], "Include field details in results"] = False,
-    exclude_aggregates: Annotated[Union[str, bool], "Exclude aggregate helper types (default: True)"] = True,
-    use_regex: Annotated[Union[str, bool], "Use regex for search operation (default: False)"] = False
+    exclude_aggregates: Annotated[Union[str, bool], "Exclude aggregate helper types"] = True,
+    use_regex: Annotated[Union[str, bool], "Use regex for search operation"] = False
 ) -> str:
     """
     Unified schema exploration tool for NCAAF GraphQL API.

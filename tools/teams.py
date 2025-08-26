@@ -148,12 +148,12 @@ async def GetTeams(
     conference: Annotated[Optional[str], "Conference name filter (e.g., 'ACC', 'SEC', 'Big 12')"] = None,
     division: Annotated[Optional[str], "Division name filter (e.g., 'FBS', 'FCS')"] = None,
     search: Annotated[Optional[str], "Search teams by name or abbreviation"] = None,
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of teams to return (default: 100, can be string or int)"] = 100,
-    include_records: Annotated[Union[str, bool], "Include team records and season statistics (default: false)"] = False,
-    include_roster: Annotated[Union[str, bool], "Include current roster information (default: false)"] = False,
-    include_coaching: Annotated[Union[str, bool], "Include coaching staff details (default: false)"] = False,
-    include_facilities: Annotated[Union[str, bool], "Include stadium and facility information (default: false)"] = False,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of teams to return"] = 20,
+    include_records: Annotated[Union[str, bool], "Include team records and season statistics"] = False,
+    include_roster: Annotated[Union[str, bool], "Include current roster information"] = False,
+    include_coaching: Annotated[Union[str, bool], "Include coaching staff details"] = False,
+    include_facilities: Annotated[Union[str, bool], "Include stadium and facility information"] = False,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get college football teams with flexible filtering and optional enhancements.
@@ -165,7 +165,7 @@ async def GetTeams(
         conference: Filter by conference name (e.g., "ACC", "SEC", "Big 12")
         division: Filter by division (e.g., "FBS", "FCS")
         search: Search teams by name or abbreviation
-        limit: Maximum number of teams to return (default: 100)
+        limit: Maximum number of teams to return (default: 20)
         include_records: Include team records and statistics (future enhancement)
         include_roster: Include current roster information (future enhancement)
         include_coaching: Include coaching staff details (future enhancement) 
@@ -176,7 +176,7 @@ async def GetTeams(
         JSON string with team information
     
     Examples:
-        - GetTeams() -> All teams (up to 100)
+        - GetTeams() -> All teams (up to 20)
         - GetTeams(conference="SEC") -> SEC teams only
         - GetTeams(search="Alabama") -> Teams matching "Alabama"
         - GetTeams(conference="ACC", limit=20) -> First 20 ACC teams
@@ -236,9 +236,9 @@ async def GetTeams(
 
 @mcp.tool()
 async def GetTeamDetails(
-    team_id: Annotated[Optional[Union[str, int]], "Team ID number (optional, can be string or int)"] = None,
-    school_name: Annotated[Optional[str], "School name to search for (optional, supports partial matches)"] = None,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    team_id: Annotated[Optional[Union[str, int]], "Team ID number"] = None,
+    school_name: Annotated[Optional[str], "School name to search for (supports partial matches)"] = None,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Get detailed information for a specific team.
@@ -282,8 +282,8 @@ async def GetTeamDetails(
 @mcp.tool()
 async def SearchTeams(
     search_term: Annotated[str, "Text to search for in school names or abbreviations"],
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of results to return (default: 5, can be string or int)"] = 5,
-    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of results to return"] = 5,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data"] = False
 ) -> str:
     """
     Search for teams by school name or abbreviation.
