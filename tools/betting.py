@@ -404,3 +404,244 @@ async def GetBettingLines(
         return result
     else:
         return safe_format_response(result, 'betting', include_raw_data_bool)
+
+
+@mcp.tool()
+async def GetBettingAnalysis(
+    team_id: Annotated[Union[str, int], "Team ID to analyze"],
+    opponent_id: Annotated[Optional[Union[str, int]], "Opponent team ID for head-to-head analysis"] = None,
+    analysis_type: Annotated[str, "Analysis type: 'spread_ranges', 'over_under', 'h2h', 'trends', or 'all' (default)"] = "all",
+    season: Annotated[Optional[Union[str, int]], "Season year (default: current season)"] = None,
+    last_n_games: Annotated[Optional[Union[str, int]], "Number of recent games for trend analysis (default: 10)"] = 10,
+    include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
+) -> str:
+    """
+    Advanced betting analysis tool for specific analytical questions.
+    
+    Provides targeted betting insights based on analysis_type:
+    - spread_ranges: How team performs at different spread levels (underdog vs favorite)
+    - over_under: Over/Under performance at different total ranges
+    - h2h: Head-to-head betting record with specific opponent 
+    - trends: Recent betting trends and home/away splits
+    - all: Complete analysis package with multiple insights
+    
+    Args:
+        team_id: Team ID to analyze
+        opponent_id: Opponent team ID for head-to-head analysis
+        analysis_type: Type of analysis to perform
+        season: Season year (default: current season)
+        last_n_games: Number of recent games for trend analysis
+        include_raw_data: Include raw GraphQL response data
+        
+    Returns:
+        YAML formatted betting analysis with actionable insights
+    """
+    # Process parameters
+    from utils.param_utils import safe_int_conversion, safe_bool_conversion, preprocess_betting_params
+    from utils.graphql_utils import build_query_variables
+    from utils.response_formatter import create_formatted_response
+    from utils.betting_utils import (
+        analyze_spread_ranges, 
+        analyze_head_to_head, 
+        analyze_betting_trends,
+        analyze_over_under_ranges,
+        format_betting_analysis_response
+    )
+    
+    team_id_int = safe_int_conversion(team_id, 'team_id')
+    opponent_id_int = safe_int_conversion(opponent_id, 'opponent_id') if opponent_id else None
+    season_int = safe_int_conversion(season, 'season') if season else None
+    last_n_games_int = safe_int_conversion(last_n_games, 'last_n_games') if last_n_games else 10
+    include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
+    
+    if not team_id_int:
+        return create_formatted_response(
+            '{"error": "Invalid team_id"}',
+            {"error": "Invalid team_id provided"},
+            [],
+            include_raw_data_bool
+        )
+    
+    # Determine which GraphQL query to use (reuse existing queries from GetBettingLines)
+    if season_int:
+        query = GET_BETTING_LINES_WITH_TEAM_QUERY
+        variables = build_query_variables(teamId=team_id_int, season=season_int, limit=100)
+    else:
+        query = GET_BETTING_LINES_WITH_TEAM_NO_SEASON_QUERY
+        variables = build_query_variables(teamId=team_id_int, limit=100)
+    
+    # Execute the GraphQL query to get raw game data
+    try:
+        result = await execute_graphql(query, variables)
+        
+        # Parse games from GraphQL result
+        import json
+        data = json.loads(result)
+        games = data.get('data', {}).get('game', [])
+        
+        if not games:
+            return create_formatted_response(
+                result,
+                {"error": "No games found for this team", "team_id": team_id_int},
+                [],
+                include_raw_data_bool
+            )
+        
+        # Get team name from first game
+        team_name = None
+        for game in games:
+            home_team_info = game.get('homeTeamInfo', {})
+            away_team_info = game.get('awayTeamInfo', {})
+            
+            if home_team_info.get('teamId') == team_id_int:
+                team_name = home_team_info.get('school')
+                break
+            elif away_team_info.get('teamId') == team_id_int:
+                team_name = away_team_info.get('school')
+                break
+        
+        if not team_name:
+            return create_formatted_response(
+                result,
+                {"error": "Could not determine team name", "team_id": team_id_int},
+                [],
+                include_raw_data_bool
+            )
+        
+        # Get opponent name if doing H2H analysis
+        opponent_name = None
+        if opponent_id_int and analysis_type in ['h2h', 'all']:
+            # Get opponent name from GraphQL directly to avoid circular imports
+            from utils.graphql_utils import build_query_variables
+            
+            GET_TEAM_NAME_QUERY = """
+            query GetTeamName($teamId: Int!) {
+                currentTeams(where: { teamId: { _eq: $teamId } }) {
+                    school
+                }
+            }
+            """
+            
+            try:
+                team_variables = build_query_variables(teamId=opponent_id_int)
+                team_result = await execute_graphql(GET_TEAM_NAME_QUERY, team_variables)
+                team_data = json.loads(team_result)
+                teams = team_data.get('data', {}).get('currentTeams', [])
+                if teams:
+                    opponent_name = teams[0].get('school')
+            except:
+                pass  # If we can't get opponent name, skip H2H analysis
+        
+        # Perform requested analysis
+        analysis_results = {}
+        
+        if analysis_type in ['spread_ranges', 'all']:
+            spread_analysis = analyze_spread_ranges(games, team_name)
+            analysis_results['spread_ranges'] = spread_analysis
+        
+        if analysis_type in ['h2h', 'all'] and opponent_name:
+            h2h_analysis = analyze_head_to_head(games, team_name, opponent_name)
+            analysis_results['h2h'] = h2h_analysis
+        
+        if analysis_type in ['over_under', 'all']:
+            ou_analysis = analyze_over_under_ranges(games, team_name)
+            analysis_results['over_under'] = ou_analysis
+        
+        if analysis_type in ['trends', 'all']:
+            trend_analysis = analyze_betting_trends(games, team_name, last_n_games_int)
+            analysis_results['trends'] = trend_analysis
+        
+        # Format response based on analysis type
+        if analysis_type == 'all':
+            # Combined analysis - create comprehensive summary
+            summary = {
+                "team": team_name,
+                "analysis_type": "Complete Betting Analysis",
+                "total_games_analyzed": len(games),
+                "season": season_int if season_int else "All seasons"
+            }
+            
+            formatted_entries = []
+            
+            # Add spread range results
+            if 'spread_ranges' in analysis_results:
+                spread_data = analysis_results['spread_ranges']
+                for range_key, range_info in spread_data.items():
+                    if isinstance(range_info, dict) and range_info.get('games', 0) > 0:
+                        entry = {
+                            "analysis": "Spread Range",
+                            "range": range_info['display_name'],
+                            "games": range_info['games'],
+                            "ats_record": range_info['ats_record'],
+                            "ats_percentage": f"{range_info['ats_percentage']}%"
+                        }
+                        formatted_entries.append(entry)
+            
+            # Add O/U results if available
+            if 'over_under' in analysis_results:
+                ou_data = analysis_results['over_under']
+                for range_key, range_info in ou_data.items():
+                    if isinstance(range_info, dict) and range_info.get('games', 0) > 0:
+                        entry = {
+                            "analysis": "O/U Range",
+                            "total_range": range_info['display_name'],
+                            "games": range_info['games'],
+                            "over_record": range_info['over_record'],
+                            "over_percentage": f"{range_info['over_percentage']}%"
+                        }
+                        formatted_entries.append(entry)
+            
+            # Add H2H results if available
+            if 'h2h' in analysis_results:
+                h2h_data = analysis_results['h2h']
+                if h2h_data.get('total_games', 0) > 0:
+                    all_time = h2h_data.get('all_time_record', {})
+                    entry = {
+                        "analysis": "Head-to-Head vs " + opponent_name,
+                        "total_games": h2h_data['total_games'],
+                        "ats_record": all_time.get('ats_record', 'N/A'),
+                        "ats_percentage": f"{all_time.get('ats_percentage', 0)}%"
+                    }
+                    formatted_entries.append(entry)
+            
+            # Add trend results
+            if 'trends' in analysis_results:
+                trend_data = analysis_results['trends']
+                overall = trend_data.get('overall_trends', {})
+                entry = {
+                    "analysis": trend_data.get('analysis_period', 'Recent Trends'),
+                    "ats_record": overall.get('ats_record', 'N/A'),
+                    "ats_percentage": f"{overall.get('ats_percentage', 0)}%",
+                    "note": "Recent performance trends"
+                }
+                formatted_entries.append(entry)
+            
+            return create_formatted_response(result, summary, formatted_entries, include_raw_data_bool)
+        
+        else:
+            # Single analysis type
+            if analysis_type in analysis_results:
+                analysis_data = analysis_results[analysis_type]
+                formatted_response = format_betting_analysis_response(analysis_data, team_name, analysis_type)
+                
+                return create_formatted_response(
+                    result, 
+                    formatted_response['summary'], 
+                    formatted_response['entries'], 
+                    include_raw_data_bool
+                )
+            else:
+                return create_formatted_response(
+                    result,
+                    {"error": f"Analysis type '{analysis_type}' not available or no data"},
+                    [],
+                    include_raw_data_bool
+                )
+        
+    except Exception as e:
+        error_summary = {
+            "error": f"Failed to perform betting analysis: {str(e)}",
+            "team_id": team_id_int,
+            "analysis_type": analysis_type
+        }
+        return create_formatted_response('{"error": "GraphQL query failed"}', error_summary, [], include_raw_data_bool)

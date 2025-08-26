@@ -282,7 +282,7 @@ async def GetTeamDetails(
 @mcp.tool()
 async def SearchTeams(
     search_term: Annotated[str, "Text to search for in school names or abbreviations"],
-    limit: Annotated[Optional[Union[str, int]], "Maximum number of results to return (default: 20, can be string or int)"] = 20,
+    limit: Annotated[Optional[Union[str, int]], "Maximum number of results to return (default: 5, can be string or int)"] = 5,
     include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
     """
@@ -297,7 +297,7 @@ async def SearchTeams(
         include_raw_data: Include raw GraphQL response data (default: false)
     """
     # Process parameters
-    limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 20
+    limit_int = safe_int_conversion(limit, 'limit') if limit is not None else 5
     search_pattern = format_search_pattern(search_term)
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     
