@@ -61,6 +61,7 @@ async def create_pool() -> Optional[AsyncConnectionPool]:
             min_size=1,  # Keep minimal connections
             max_size=5,  # Limit connection overhead
             timeout=1.0,  # 1 second max wait for connection
+            open=False,  # Use modern pattern - explicitly open the pool
             kwargs={
                 "row_factory": dict_row,
                 "autocommit": True,
@@ -68,6 +69,9 @@ async def create_pool() -> Optional[AsyncConnectionPool]:
                 "options": "-c statement_timeout=1000"  # 1 second statement timeout
             }
         )
+        
+        # Explicitly open the pool using modern pattern
+        await _pool.open()
         logger.info("Database connection pool created successfully")
         return _pool
     except Exception as e:
@@ -105,26 +109,17 @@ async def get_connection(timeout: float = 1.0):
         yield None
         return
     
-    conn = None
     try:
-        # Try to get a connection with timeout
-        conn = await asyncio.wait_for(
-            pool.getconn(),
-            timeout=timeout
-        )
-        yield conn
+        # Use modern pool.connection() context manager with timeout
+        async with asyncio.timeout(timeout):
+            async with pool.connection() as conn:
+                yield conn
     except asyncio.TimeoutError:
         logger.debug("Timeout getting database connection")
         yield None
     except Exception as e:
         logger.debug(f"Error getting database connection: {e}")
         yield None
-    finally:
-        if conn and pool:
-            try:
-                await pool.putconn(conn)
-            except Exception:
-                pass  # Silently ignore putconn errors
 
 
 async def execute_insert_with_timeout(
