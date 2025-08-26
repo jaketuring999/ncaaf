@@ -202,21 +202,12 @@ ratings(where: { season: { _eq: $season }}) {
 
 ## Testing Checklist
 
-### Unit Tests
-- [ ] Verify new fields are returned correctly
-- [ ] Test ordering with null values
-- [ ] Confirm backward compatibility
 
 ### Integration Tests
 - [ ] Test each enhanced tool with real queries
 - [ ] Verify response formatting
 - [ ] Check performance impact
 
-### User Acceptance
-- [ ] Games sorted by excitement make sense
-- [ ] Betting lines show most interesting games first
-- [ ] Metrics provide actionable insights
-- [ ] Rankings show movement indicators
 
 ## Rollback Plan
 1. Keep original queries in `queries/legacy/` folder
@@ -233,10 +224,3 @@ ratings(where: { season: { _eq: $season }}) {
 - GraphQL schema remains stable
 - No breaking changes to tool interfaces
 - Existing tests pass with enhancements
-
-## Timeline
-- Day 1-2: Implement game query enhancements
-- Day 3: Update betting queries
-- Day 4: Enhance metrics queries
-- Day 5: Add rankings movement
-- Day 6-7: Testing and refinement
