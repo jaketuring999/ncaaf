@@ -13,6 +13,7 @@ from src.graphql_executor import execute_graphql
 from utils.param_utils import preprocess_game_params, safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
 from utils.response_formatter import safe_format_response
+from utils.team_resolver import resolve_optional_team_id
 
 # GraphQL queries for game data
 # Query for games with both season and week
@@ -520,7 +521,7 @@ query GetRecentGames($limit: Int) {
 async def GetGames(
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
     week: Annotated[Optional[Union[str, int]], "Week number (1-15 for regular season, can be string or int)"] = None,
-    team_id: Annotated[Optional[Union[str, int]], "Get games for specific team (can be string or int)"] = None,
+    team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
     include_betting_lines: Annotated[Union[str, bool], "Include betting line information (can be string or bool)"] = False,
     include_weather: Annotated[Union[str, bool], "Include weather data (can be string or bool)"] = False,
     include_media: Annotated[Union[str, bool], "Include media/TV information (can be string or bool)"] = False,
@@ -534,7 +535,7 @@ async def GetGames(
     Args:
         season: Season year (e.g., 2024 or "2024")
         week: Week number (1-15 for regular season, can be string or int)
-        team_id: Get games for specific team (can be string or int)
+        team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
         include_betting_lines: Include betting line information (can be string or bool)
         include_weather: Include weather data (can be string or bool)
         include_media: Include media/TV information (can be string or bool)
@@ -546,9 +547,11 @@ async def GetGames(
         JSON string with game information, optionally enhanced with statistical analysis
     """
     # Preprocess parameters to handle string inputs
-    from src.param_processor import safe_bool_conversion
     calculate_stats_bool = safe_bool_conversion(calculate_stats, 'calculate_stats')
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
+    
+    # Resolve team to ID if provided
+    team_id = await resolve_optional_team_id(team)
     
     processed = preprocess_game_params(
         season=season,
@@ -560,14 +563,29 @@ async def GetGames(
         include_media=include_media
     )
     
-    # If team_id is provided, use the team games query to avoid null issues
+    # If team is provided, use the appropriate team games query
     if processed.get('team_id'):
-        variables = build_query_variables(
-            teamId=processed.get('team_id'),
-            season=processed.get('season'),
-            limit=processed.get('limit')
-        )
-        return await execute_graphql(GET_TEAM_GAMES_QUERY, variables)
+        if processed.get('season') is not None:
+            # Use team games query with season filter
+            variables = build_query_variables(
+                teamId=processed.get('team_id'),
+                season=processed.get('season'),
+                limit=processed.get('limit')
+            )
+            result = await execute_graphql(GET_TEAM_GAMES_WITH_SEASON_QUERY, variables)
+        else:
+            # Use team games query without season filter
+            variables = build_query_variables(
+                teamId=processed.get('team_id'),
+                limit=processed.get('limit')
+            )
+            result = await execute_graphql(GET_TEAM_GAMES_QUERY, variables)
+        
+        # Format response based on include_raw_data flag
+        if include_raw_data_bool:
+            return result
+        else:
+            return safe_format_response(result, 'games', include_raw_data_bool)
     
     # Select appropriate query based on which parameters are provided
     season = processed.get('season')
@@ -641,7 +659,7 @@ async def GetGames(
                 result_data['game_statistics_error'] = game_stats['error']
                 result = json.dumps(result_data, indent=2)
                 
-        except Exception as e:
+        except Exception:
             # Don't fail the main query if statistics calculation fails
             pass
     
@@ -708,7 +726,7 @@ async def GetGamesByWeek(
                 result_data['weekly_trends_error'] = weekly_trends['error']
                 result = json.dumps(result_data, indent=2)
                 
-        except Exception as e:
+        except Exception:
             # Don't fail the main query if trends calculation fails
             pass
     
@@ -720,7 +738,7 @@ async def GetGamesByWeek(
 
 @mcp.tool()
 async def GetTeamGames(
-    team_id: Annotated[Union[str, int], "Team ID number (can be string or int)"],
+    team: Annotated[str, "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"],
     season: Annotated[Optional[Union[str, int]], "Season year (optional, can be string or int)"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (can be string or int)"] = None,
     calculate_performance: Annotated[Union[str, bool], "Calculate team performance metrics (default: false)"] = False,
@@ -730,7 +748,7 @@ async def GetTeamGames(
     Get all games for a specific team.
     
     Args:
-        team_id: Team ID number (can be string or int)
+        team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
         season: Season year (optional, can be string or int)
         limit: Maximum number of games to return (can be string or int)
         calculate_performance: Calculate team performance metrics (default: false)
@@ -739,8 +757,9 @@ async def GetTeamGames(
     Returns:
         JSON string with team's games, optionally enhanced with performance analysis
     """
-    # Convert string inputs to appropriate types
-    team_id_int = safe_int_conversion(team_id, 'team_id')
+    # Convert string inputs to appropriate types and resolve team
+    from utils.team_resolver import resolve_team_id
+    team_id_int = await resolve_team_id(team)
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     limit_int = safe_int_conversion(limit, 'limit') if limit is not None else None
     calculate_performance_bool = safe_bool_conversion(calculate_performance, 'calculate_performance')
@@ -781,7 +800,7 @@ async def GetTeamGames(
                 result_data['team_performance_error'] = team_performance['error']
                 result = json.dumps(result_data, indent=2)
                 
-        except Exception as e:
+        except Exception:
             # Don't fail the main query if performance analysis fails
             pass
     

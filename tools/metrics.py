@@ -13,6 +13,7 @@ from src.graphql_executor import execute_graphql
 from utils.param_utils import safe_int_conversion, safe_bool_conversion
 from utils.graphql_utils import build_query_variables
 from utils.response_formatter import safe_format_response
+from utils.team_resolver import resolve_optional_team_id
 
 # Placeholder - will implement later
 GET_ADVANCED_METRICS_QUERY = """
@@ -38,7 +39,7 @@ query GetAdvancedMetrics($teamId: Int, $season: smallint) {
 
 @mcp.tool()
 async def GetAdvancedMetrics(
-    team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
+    team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
     include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
 ) -> str:
@@ -46,15 +47,15 @@ async def GetAdvancedMetrics(
     Get advanced team metrics.
     
     Args:
-        team_id: Team ID (can be string or int)
+        team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
         season: Season year (e.g., 2024 or "2024")
     
     Returns:
         JSON string with advanced metrics data
         include_raw_data: Include raw GraphQL response data (default: false)
     """
-    # Convert string inputs to integers
-    team_id_int = safe_int_conversion(team_id, 'team_id') if team_id is not None else None
+    # Convert string inputs to integers and resolve team
+    team_id_int = await resolve_optional_team_id(team)
     season_int = safe_int_conversion(season, 'season') if season is not None else None
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
     

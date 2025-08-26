@@ -152,8 +152,10 @@ def preprocess_team_params(
     """
     Preprocess team tool parameters with validation and type conversion.
     
+    Note: team_id should be resolved from team name before calling this function.
+    
     Args:
-        team_id: Team ID (can be string or int)
+        team_id: Resolved team ID (integer from team resolver)
         conference: Conference name filter
         division: Division name filter  
         search: Search query for team names/abbreviations
@@ -220,10 +222,12 @@ def preprocess_game_params(
     """
     Preprocess game tool parameters with validation and type conversion.
     
+    Note: team_id should be resolved from team name before calling this function.
+    
     Args:
         season: Season year (can be string or int)
         week: Week number (can be string or int)
-        team_id: Team ID (can be string or int)
+        team_id: Resolved team ID (integer from team resolver)
         limit: Result limit (can be string or int)
         include_betting_lines: Include betting data (can be string or bool)
         include_weather: Include weather data (can be string or bool)
@@ -277,10 +281,12 @@ def preprocess_betting_params(
     """
     Preprocess betting tool parameters with validation and type conversion.
     
+    Note: team_id should be resolved from team name before calling this function.
+    
     Args:
         season: Season year (can be string or int)
         week: Week number (can be string or int)
-        team_id: Team ID (can be string or int)
+        team_id: Resolved team ID (integer from team resolver)
         limit: Result limit (can be string or int)
         calculate_records: Calculate betting records (can be string or bool)
         calculate_trends: Calculate betting trends (can be string or bool)

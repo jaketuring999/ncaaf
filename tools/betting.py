@@ -13,6 +13,7 @@ from src.graphql_executor import execute_graphql
 from utils.param_utils import safe_int_conversion, safe_bool_conversion, preprocess_betting_params
 from utils.graphql_utils import build_query_variables
 from utils.response_formatter import safe_format_response
+from utils.team_resolver import resolve_optional_team_id
 
 # GraphQL queries for betting lines data
 # Query with both season and week
@@ -304,7 +305,7 @@ query GetBettingLines($limit: Int) {
 async def GetBettingLines(
     season: Annotated[Optional[Union[str, int]], "Season year (e.g., 2024 or '2024')"] = None,
     week: Annotated[Optional[Union[str, int]], "Week number (can be string or int)"] = None,
-    team_id: Annotated[Optional[Union[str, int]], "Team ID (can be string or int)"] = None,
+    team: Annotated[Optional[str], "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"] = None,
     limit: Annotated[Optional[Union[str, int]], "Maximum number of games to return (default: 50, can be string or int)"] = 50,
     calculate_records: Annotated[Union[str, bool], "Calculate ATS, Over/Under, and SU records (default: false)"] = False,
     include_raw_data: Annotated[Union[str, bool], "Include raw GraphQL response data (default: false)"] = False
@@ -315,7 +316,7 @@ async def GetBettingLines(
     Args:
         season: Season year (e.g., 2024 or "2024")
         week: Week number (can be string or int)
-        team_id: Team ID (can be string or int)
+        team: Team name, abbreviation, or ID (e.g., "Alabama", "BAMA", "333")
         limit: Maximum number of games to return (default: 50, can be string or int)
         calculate_records: Calculate ATS, Over/Under, and SU records (default: false)
         include_raw_data: Include raw GraphQL response data (default: false)
@@ -325,6 +326,9 @@ async def GetBettingLines(
     """
     # Process parameters using consolidated utility
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
+    
+    # Resolve team to ID if provided
+    team_id = await resolve_optional_team_id(team)
     
     params = preprocess_betting_params(
         season=season,
@@ -408,8 +412,8 @@ async def GetBettingLines(
 
 @mcp.tool()
 async def GetBettingAnalysis(
-    team_id: Annotated[Union[str, int], "Team ID to analyze"],
-    opponent_id: Annotated[Optional[Union[str, int]], "Opponent team ID for head-to-head analysis"] = None,
+    team: Annotated[str, "Team name, abbreviation, or ID (e.g., 'Alabama', 'BAMA', '333')"],
+    opponent: Annotated[Optional[str], "Opponent team name, abbreviation, or ID for head-to-head analysis"] = None,
     analysis_type: Annotated[str, "Analysis type: 'spread_ranges', 'over_under', 'h2h', 'trends', or 'all' (default)"] = "all",
     season: Annotated[Optional[Union[str, int]], "Season year (default: current season)"] = None,
     last_n_games: Annotated[Optional[Union[str, int]], "Number of recent games for trend analysis (default: 10)"] = 10,
@@ -426,8 +430,8 @@ async def GetBettingAnalysis(
     - all: Complete analysis package with multiple insights
     
     Args:
-        team_id: Team ID to analyze
-        opponent_id: Opponent team ID for head-to-head analysis
+        team: Team name, abbreviation, or ID to analyze
+        opponent: Opponent team name, abbreviation, or ID for head-to-head analysis
         analysis_type: Type of analysis to perform
         season: Season year (default: current season)
         last_n_games: Number of recent games for trend analysis
@@ -448,8 +452,11 @@ async def GetBettingAnalysis(
         format_betting_analysis_response
     )
     
-    team_id_int = safe_int_conversion(team_id, 'team_id')
-    opponent_id_int = safe_int_conversion(opponent_id, 'opponent_id') if opponent_id else None
+    # Resolve team names to IDs
+    from utils.team_resolver import resolve_team_id, resolve_optional_team_id
+    
+    team_id_int = await resolve_team_id(team)
+    opponent_id_int = await resolve_optional_team_id(opponent)
     season_int = safe_int_conversion(season, 'season') if season else None
     last_n_games_int = safe_int_conversion(last_n_games, 'last_n_games') if last_n_games else 10
     include_raw_data_bool = safe_bool_conversion(include_raw_data, 'include_raw_data')
