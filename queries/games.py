@@ -19,8 +19,9 @@ query GetGames(
             seasonType: { _eq: $seasonType }
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -101,8 +102,9 @@ query GetGames(
             week: { _eq: $week }
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -183,8 +185,9 @@ query GetGames(
             seasonType: { _eq: $seasonType }
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -263,8 +266,9 @@ query GetGames(
             season: { _eq: $season }
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -343,8 +347,9 @@ query GetGames(
             week: { _eq: $week }
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -419,8 +424,9 @@ query GetGames(
 ) {
     game(
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -498,8 +504,9 @@ query GetGamesByWeek(
             week: { _eq: $week }
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
+            { conferenceGame: DESC }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -547,8 +554,8 @@ query GetTeamGames(
             ]
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -594,8 +601,8 @@ query GetTeamGames(
             ]
         }
         orderBy: [
+            { excitement: DESC_NULLS_LAST }
             { startDate: ASC }
-            { id: ASC }
         ]
         limit: $limit
     ) {
@@ -634,7 +641,10 @@ query GetRecentGames($limit: Int) {
         where: {
             status: { _eq: "completed" }
         }
-        orderBy: { startDate: DESC }
+        orderBy: [
+            { startDate: DESC }
+            { excitement: DESC_NULLS_LAST }
+        ]
         limit: $limit
     ) {
         id
