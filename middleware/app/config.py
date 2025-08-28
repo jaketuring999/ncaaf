@@ -53,9 +53,9 @@ class SystemPromptLoader:
     def load_prompt() -> str:
         """Load system prompt from file or return default"""
         prompt_paths = [
-            "./prompts/ncaaf-systemprompt-v2.xml",
-            "../prompts/ncaaf-systemprompt-v2.xml",
-            "/Users/Jake/PycharmProjects/ncaaf/middleware/prompts/ncaaf-systemprompt-v2.xml"
+            "./prompts/ncaaf-systemprompt-v3.xml",
+            "../prompts/ncaaf-systemprompt-v3.xml",
+            "/Users/Jake/PycharmProjects/ncaaf/middleware/prompts/ncaaf-systemprompt-v3.xml"
         ]
         
         for path in prompt_paths:
