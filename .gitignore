@@ -198,3 +198,5 @@ ehthumbs.db
 dep/
 
 .claude
+
+tests/
