@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     mcp_server_timeout: int = 60
     
     # OpenAI Configuration
-    openai_model: str = "gpt-5-mini"
+    openai_model: str = "gpt-4.1-mini"
     
     # Performance Settings
     max_concurrent_requests: int = 100
